@@ -22,11 +22,37 @@ class HomeFragment : BaseFlowFragment(), BottomNavigationDestination, AppBarDest
     override val showAppBarBack = false
     override val showNotificationAction = true
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshUser()
+    }
+
     @Composable
     override fun ScreenContent() {
         val state = viewModel.uiState.collectAsStateWithLifecycle().value
-        HomeScreen(state, onStartQuestionnaire = {
-            Navigator.questionnaire(requireActivity() as FlowNavigationHost, viewModel.startSession(), QuestionnairePhase.PRE)
-        })
+        HomeScreen(
+            state = state,
+            onStartQuestionnaire = {
+                viewModel.startSession()?.let { sessionId ->
+                    Navigator.questionnaire(requireActivity() as FlowNavigationHost, sessionId, QuestionnairePhase.PRE)
+                }
+            },
+            onEditUserInfo = {
+                Navigator.editUserInfo(requireActivity() as FlowNavigationHost)
+            },
+            onContinueStep = { stepNumber ->
+                if (stepNumber == 1 && state.user == null) {
+                    Navigator.editUserInfo(requireActivity() as FlowNavigationHost)
+                } else {
+                    val sessionId = viewModel.currentProgress()?.sessionId ?: if (stepNumber == 1) viewModel.startSession() else null
+                    when (stepNumber) {
+                        1 -> sessionId?.let { Navigator.questionnaire(requireActivity() as FlowNavigationHost, it, QuestionnairePhase.PRE) }
+                        2 -> sessionId?.let { Navigator.device(requireActivity() as FlowNavigationHost, it) }
+                        3 -> sessionId?.let { Navigator.collection(requireActivity() as FlowNavigationHost, it, com.smarthealth.vitalhub.core.navigation.CollectionMode.PREVIEW) }
+                        4 -> sessionId?.let { Navigator.questionnaire(requireActivity() as FlowNavigationHost, it, QuestionnairePhase.POST) }
+                    }
+                }
+            },
+        )
     }
 }

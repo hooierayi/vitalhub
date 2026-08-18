@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ARouter routes and Provider implementations are discovered at runtime.
+-keep public class com.alibaba.android.arouter.routes.** { *; }
+-keep public class * implements com.alibaba.android.arouter.facade.template.IProvider { *; }
+-keep @com.alibaba.android.arouter.facade.annotation.Route class * { *; }

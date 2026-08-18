@@ -30,6 +30,9 @@ object Navigator {
     fun home(host: FlowNavigationHost, clearBackStack: Boolean = true) =
         host.show(resolve(Routes.HOME), addToBackStack = false, clearBackStack = clearBackStack)
 
+    fun editUserInfo(host: FlowNavigationHost) =
+        host.show(resolve(Routes.USER_INFO_EDIT))
+
     fun questionnaire(host: FlowNavigationHost, sessionId: String, phase: String) =
         host.show(ARouter.getInstance().build(Routes.QUESTIONNAIRE)
             .withString(RouteArgs.SESSION_ID, sessionId)

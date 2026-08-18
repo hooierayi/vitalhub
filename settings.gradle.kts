@@ -22,7 +22,11 @@ dependencyResolutionManagement {
 rootProject.name = "VitalHubApplication"
 include(":app")
 include(":core:common")
+include(":core:storage")
+include(":provider:user")
+include(":provider:collection")
 include(":feature:home")
+include(":feature:user")
 include(":feature:questionnaire")
 include(":feature:device")
 include(":feature:collection")

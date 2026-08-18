@@ -23,6 +23,18 @@ kapt {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":provider:collection"))
     implementation(platform(libs.compose.bom))
+    implementation(libs.arouter.api)
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.graphics)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.fragment.ktx)
+    implementation(libs.kotlinx.coroutines.core)
     kapt(libs.arouter.compiler)
 }

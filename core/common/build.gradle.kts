@@ -19,16 +19,16 @@ android {
 }
 
 dependencies {
-    api(libs.androidx.core.ktx)
-    api(libs.androidx.appcompat)
-    api(libs.material)
-    api(libs.arouter.api)
-    api(platform(libs.compose.bom))
-    api(libs.compose.ui)
-    api(libs.compose.ui.tooling.preview)
-    api(libs.compose.material3)
-    api(libs.androidx.lifecycle.runtime.compose)
-    api(libs.androidx.lifecycle.viewmodel.ktx)
-    api(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.arouter.api)
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.fragment.ktx)
     debugImplementation(libs.compose.ui.tooling)
 }

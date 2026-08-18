@@ -5,20 +5,27 @@
 ```text
 app
  └─ MainActivity（唯一 Activity / Fragment 宿主）
-     ├─ feature:home
-     ├─ feature:questionnaire
-     ├─ feature:device
-     ├─ feature:collection
+     ├─ feature:home ────────► provider:user
+     │                    └─► provider:collection
+     ├─ feature:user ────────► provider:user
+     ├─ feature:questionnaire ─► provider:collection
+     ├─ feature:device ─────────► provider:collection
+     ├─ feature:collection ─────► provider:collection
      └─ feature:analysis
            └──────────► core:common
+feature:user ──────────► core:storage
 ```
 
 - `app`：应用壳、唯一 `MainActivity`、Compose 底部导航、Fragment 返回栈和 ARouter 初始化。
 - `core:common`：路由契约、跨模块模型、Compose 主题与公共组件；不依赖任何业务模块。
+- `core:storage`：可复用的本地键值存储，提供 SharedPreferences/MMKV 后端、批量编辑和可选 Android Keystore 加密。
+- `provider:user`：用户资料模型和 ARouter Provider 契约。
+- `provider:collection`：首页采集流程的持久化进度模型和 ARouter Provider 契约。
 - `feature:home`：采集任务入口与任务列表。
+- `feature:user`：用户信息编辑页面，以及以 ARouter Provider 暴露的 MMKV `UserInfoProvider` 实现。
 - `feature:questionnaire`：采集前睡眠问卷、采集后热相关症状问卷。
 - `feature:device`：BLE 权限、扫描、连接及设备状态展示。
-- `feature:collection`：实时预览、2 分钟片段、本地缓存/上传和连续记录。
+- `feature:collection`：实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程进度的 MMKV Provider 实现。
 - `feature:analysis`：异步 AI 分析任务及结果。
 
 业务模块之间不得添加直接 Gradle 依赖。每个模块用 `@Route` 暴露 Fragment，
@@ -57,6 +64,10 @@ ARouter 负责发现和创建目标 Fragment，`MainActivity` 实现的 `FlowNav
 - `sessionId`：一次用户采集任务，关联前后问卷、设备、片段、上传与诊断结果。
 - `recordId`：记录仪创建的连续记录文件标识。
 - `cmdSeq`：设备控制命令序号，用于 ACK/NACK、超时重试和幂等处理。
+
+首页采集流程固定为“采集前问卷、连接设备、开始采集、采集后问卷”四步。前问卷、
+设备连接、正常结束采集和后问卷提交依次使进度达到 1/4 至 4/4；设备或采集阶段
+中断后必须重新连接设备，因此回退到 1/4。AI 分析不属于首页流程，后问卷提交后直接返回首页。
 
 ## 推荐的数据层边界
 
