@@ -18,7 +18,7 @@
 
 - 优先最小、局部且可验证的改动；不做无关重构、依赖升级或模块重组。
 - 模块和 SDK 依赖禁止使用 Gradle `api`。默认使用 `implementation` 隔离实现；仅当依赖只用于编译、并且运行时由明确的应用或宿主模块负责提供时，才使用 `compileOnly`。使用 `compileOnly` 前必须确认运行时提供者在最终 APK 中以非 `compileOnly` 方式被打包，并验证所有直接消费者的编译、测试和实际运行链路均不缺类。
-- 业务 feature 之间不得新增直接 Gradle 依赖。跨模块页面交互使用 ARouter：路径与参数集中定义在 `:core:common`，调用方复用 `Navigator`，目标 feature 以 `@Route` 暴露入口；禁止直接构造、依赖或调用另一个 feature 的页面实现。
+- 业务 feature 之间不得新增直接 Gradle 依赖。跨模块页面交互使用 ARouter：路径、参数、导航策略与 `Navigator` 集中定义在 `:core:navi`，调用方复用 `Navigator`，目标 feature 以 `@Route` 暴露入口；禁止直接构造、依赖或调用另一个 feature 的页面实现。
 - 将 `:provider:*` 作为跨业务能力的优先抽象层：先定义稳定的模型、接口与回调，再在所属业务 feature 实现。**本项目新增或重构的跨模块 Provider 一律采用 ARouter Provider：接口继承 `IProvider`，实现以唯一 `@Route` 注册；调用方只依赖接口，并通过 `ARouter.navigation(接口::class.java)` 或 `@Autowired` 注入获取服务。**
 - Provider 业务接口的新增实现类及 Kotlin 文件优先命名为 `XxxProviderImpl` / `XxxProviderImpl.kt`，使接口与实现关系可直接识别；只有多个实现确实需要区分职责时才增加业务前缀。未经明确需求，不为统一命名重命名既有实现。
 - 禁止为 Provider 自建全局注册表、Service Locator，或在 `Application` 中直接引用 feature 的实现类并手动 `install`/注入。这些做法会绕过 ARouter 的服务发现、实现替换与模块边界；除非用户明确指定兼容某个既有遗留实现，否则不得以“实现更简单”作为例外。
@@ -53,7 +53,7 @@
 | 场景/关键词 | 优先读取 | 其次读取 |
 |---|---|---|
 | 构建、模块、Gradle、依赖 | `docs/architecture/index.md` | 对应模块 `build.gradle.kts` |
-| 路由、底栏、标题栏、返回栈 | `docs/architecture/app-shell.md` | `ARCHITECTURE.md`、`core/common/.../navigation/` |
+| 路由、底栏、标题栏、返回栈 | `docs/architecture/app-shell.md` | `ARCHITECTURE.md`、`core/navi/.../` |
 | 采集、问卷、设备、分析、用户资料 | `docs/glossary/index.md` | `ARCHITECTURE.md`、相关 feature 代码 |
 | 命名、Compose、跨模块调用、文档同步 | `docs/coding_standards/index.md` | 本文件工作准则 |
 | 新页面、页面样式、414dp、视觉适配 | `docs/coding_standards/visual-design.md` | `core/common/.../ui/BaseFlowFragment.kt` |
@@ -111,7 +111,8 @@
 | 模块 | 职责 | 依赖层级 | Agent 文档 |
 |---|---|---|---|
 | `:app` | Application、唯一 Activity、应用壳与顶级导航 | 组装层 | 根 `AGENTS.md` |
-| `:core:common` | 路由契约、跨模块模型、公共 UI 与导航接口 | 基础层 | 根 `AGENTS.md` |
+| `:core:common` | 跨模块通用模型与公共 UI | 基础层 | 根 `AGENTS.md` |
+| `:core:navi` | 路由契约、导航宿主接口、返回策略与导航去重 | 基础层 | 根 `AGENTS.md` |
 | `:core:storage` | 通用键值存储抽象及 SharedPreferences/MMKV 实现 | 基础层 | 根 `AGENTS.md` |
 | `:provider:user` | 用户资料的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:collection` | 采集流程进度的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |

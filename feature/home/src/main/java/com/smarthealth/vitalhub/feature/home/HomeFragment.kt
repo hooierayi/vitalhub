@@ -4,23 +4,26 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.viewModels
 import com.alibaba.android.arouter.facade.annotation.Route
-import com.smarthealth.vitalhub.core.navigation.AppBarDestination
-import com.smarthealth.vitalhub.core.navigation.BottomNavigationDestination
-import com.smarthealth.vitalhub.core.navigation.BottomNavigationKeys
-import com.smarthealth.vitalhub.core.navigation.FlowNavigationHost
-import com.smarthealth.vitalhub.core.navigation.Navigator
-import com.smarthealth.vitalhub.core.navigation.QuestionnairePhase
-import com.smarthealth.vitalhub.core.navigation.Routes
+import com.smarthealth.vitalhub.core.navi.AppBarDestination
+import com.smarthealth.vitalhub.core.navi.BottomNavigationDestination
+import com.smarthealth.vitalhub.core.navi.BottomNavigationKeys
+import com.smarthealth.vitalhub.core.navi.FlowDestination
+import com.smarthealth.vitalhub.core.navi.FlowDestinationContext
+import com.smarthealth.vitalhub.core.navi.FlowDestinationOwner
+import com.smarthealth.vitalhub.core.navi.FlowNavigationHost
+import com.smarthealth.vitalhub.core.navi.Navigator
+import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
 
 @Route(path = Routes.HOME)
-class HomeFragment : BaseFlowFragment(), BottomNavigationDestination, AppBarDestination {
+class HomeFragment : BaseFlowFragment(), BottomNavigationDestination, AppBarDestination, FlowDestinationOwner {
     private val viewModel by viewModels<HomeViewModel>()
 
     override val bottomNavigationKey = BottomNavigationKeys.COLLECTION
     override val appBarTitle = "采集任务"
     override val showAppBarBack = false
     override val showNotificationAction = true
+    override val flowDestinationContext = FlowDestinationContext(FlowDestination.HOME)
 
     override fun onResume() {
         super.onResume()
@@ -34,7 +37,7 @@ class HomeFragment : BaseFlowFragment(), BottomNavigationDestination, AppBarDest
             state = state,
             onStartQuestionnaire = {
                 viewModel.startSession()?.let { sessionId ->
-                    Navigator.questionnaire(requireActivity() as FlowNavigationHost, sessionId, QuestionnairePhase.PRE)
+                    Navigator.flow(requireActivity() as FlowNavigationHost, sessionId, FlowDestination.PRE_QUESTIONNAIRE)
                 }
             },
             onEditUserInfo = {
@@ -44,12 +47,9 @@ class HomeFragment : BaseFlowFragment(), BottomNavigationDestination, AppBarDest
                 if (stepNumber == 1 && state.user == null) {
                     Navigator.editUserInfo(requireActivity() as FlowNavigationHost)
                 } else {
-                    val sessionId = viewModel.currentProgress()?.sessionId ?: if (stepNumber == 1) viewModel.startSession() else null
-                    when (stepNumber) {
-                        1 -> sessionId?.let { Navigator.questionnaire(requireActivity() as FlowNavigationHost, it, QuestionnairePhase.PRE) }
-                        2 -> sessionId?.let { Navigator.device(requireActivity() as FlowNavigationHost, it) }
-                        3 -> sessionId?.let { Navigator.collection(requireActivity() as FlowNavigationHost, it, com.smarthealth.vitalhub.core.navigation.CollectionMode.PREVIEW) }
-                        4 -> sessionId?.let { Navigator.questionnaire(requireActivity() as FlowNavigationHost, it, QuestionnairePhase.POST) }
+                    val session = viewModel.currentSession() ?: if (stepNumber == 1) viewModel.startSessionSnapshot() else null
+                    session?.nextDestination?.let { destination ->
+                        Navigator.flow(requireActivity() as FlowNavigationHost, session.sessionId, destination)
                     }
                 }
             },

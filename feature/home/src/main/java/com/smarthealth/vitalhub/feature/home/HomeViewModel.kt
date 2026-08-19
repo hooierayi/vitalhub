@@ -3,8 +3,8 @@ package com.smarthealth.vitalhub.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alibaba.android.arouter.launcher.ARouter
-import com.smarthealth.vitalhub.provider.collection.CollectionFlowProgress
-import com.smarthealth.vitalhub.provider.collection.CollectionProgressProvider
+import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
+import com.smarthealth.vitalhub.provider.collection.CollectionFlowSnapshot
 import com.smarthealth.vitalhub.provider.user.UserInfo
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,15 +47,17 @@ class HomeViewModel : ViewModel() {
         refreshUser()
     }
 
-    fun startSession(): String? = runCatching {
-        requireNotNull(resolveCollectionProgressProvider()).startNewSession().sessionId
+    fun startSession(): String? = startSessionSnapshot()?.sessionId
+
+    fun startSessionSnapshot(): CollectionFlowSnapshot? = runCatching {
+        requireNotNull(resolveCollectionFlowProvider()).startNewSession()
     }.getOrElse {
         reportProgressError()
         null
     }
 
-    fun currentProgress(): CollectionFlowProgress? = runCatching {
-        resolveCollectionProgressProvider()?.getCurrentProgress()
+    fun currentSession(): CollectionFlowSnapshot? = runCatching {
+        resolveCollectionFlowProvider()?.getCurrentSession()
     }.getOrElse {
         reportProgressError()
         null
@@ -70,7 +72,7 @@ class HomeViewModel : ViewModel() {
             ARouter.getInstance().navigation(UserInfoProvider::class.java)
         }.getOrNull()
         val progress = runCatching {
-            resolveCollectionProgressProvider()?.recoverInterruptedHardwareFlow()
+            resolveCollectionFlowProvider()?.recoverInterruptedSession()
         }.getOrNull()
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
@@ -81,8 +83,8 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private fun resolveCollectionProgressProvider(): CollectionProgressProvider? = runCatching {
-        ARouter.getInstance().navigation(CollectionProgressProvider::class.java)
+    private fun resolveCollectionFlowProvider(): CollectionFlowProvider? = runCatching {
+        ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
     }.getOrNull()
 
     private fun collectionSteps(completedSteps: Int): List<CollectionStep> = listOf(

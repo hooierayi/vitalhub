@@ -2,8 +2,8 @@ package com.smarthealth.vitalhub.feature.questionnaire
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import com.smarthealth.vitalhub.core.navigation.QuestionnairePhase
-import com.smarthealth.vitalhub.core.navigation.RouteArgs
+import com.smarthealth.vitalhub.core.navi.QuestionnairePhase
+import com.smarthealth.vitalhub.core.navi.RouteArgs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +27,7 @@ data class QuestionnaireUiState(
     val pageIndex: Int,
     val answers: List<String>,
     val validationError: Boolean = false,
+    val flowError: String? = null,
 ) {
     val currentPage: List<Question> get() = pages[pageIndex]
     val title: String get() = if (isPre) "睡眠质量调查" else "热相关症状调查"
@@ -53,6 +54,10 @@ class QuestionnaireViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             answers = state.answers.toMutableList().also { it[questionId] = answer },
             validationError = false,
         )
+    }
+
+    fun reportFlowError() {
+        _uiState.value = _uiState.value.copy(flowError = "采集流程暂不可用，请稍后重试")
     }
 
     fun previousPage() {

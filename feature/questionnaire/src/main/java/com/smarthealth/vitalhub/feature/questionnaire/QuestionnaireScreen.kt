@@ -23,6 +23,7 @@ fun QuestionnaireScreen(state: QuestionnaireUiState, onAnswer: (Int, String) -> 
                     QuestionBlock(question, state.answers[question.id]) { onAnswer(question.id, it) }
                 }
                 if (state.validationError) Text("请完成本页所有题目后继续", color = VitalColors.Danger, fontSize = 14.sp)
+                state.flowError?.let { Text(it, color = VitalColors.Danger, fontSize = 14.sp) }
                 Spacer(Modifier.height(9.dp))
             }
             Spacer(Modifier.height(12.dp))

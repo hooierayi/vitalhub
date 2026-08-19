@@ -12,13 +12,13 @@
 
 | 场景 | 准则 | 说明 |
 |---|---|---|
-| 跨模块页面 | 使用 ARouter、`Routes` 与 `Navigator` | feature 之间只通过稳定路由契约协作，不直接引用目标页面实现 |
+| 跨模块页面 | 使用 `:core:navi` 中的 ARouter、`Routes` 与 `Navigator` | feature 之间只通过稳定路由契约协作，不直接引用目标页面实现 |
 | 跨模块业务能力 | 优先在 `:provider:*` 定义模型、接口与契约 | 具体实现留在所属 feature；需要运行时发现时才以 ARouter `IProvider` + `@Route` 注册 |
 | 页面实现 | Fragment 作为路由入口，ComposeView 承载 Compose UI | 与当前应用壳保持一致 |
 | 状态 | 页面状态归属 ViewModel，避免依赖 Fragment 临时生命周期 | 长连接/跨页面状态应设计明确所有者 |
 | 构建配置 | 仅在需求明确时修改 Gradle、Manifest 或版本目录 | 这些改动覆盖面广 |
 | 模块与 SDK 依赖 | 默认使用 `implementation`；运行时由明确宿主打包时才使用 `compileOnly` | 禁止使用 `api`；`compileOnly` 必须确认最终 APK 的提供者、直接消费者编译和运行链路均完整 |
-| 依赖 | 先复用已有 `:provider:*`、`:core:common` 或业务模块能力 | 仅确有稳定跨模块价值时新增 provider/common 契约，避免重复实现 |
+| 依赖 | 先复用已有 `:provider:*`、`:core:navi`、`:core:common` 或业务模块能力 | 仅确有稳定跨模块价值时新增 provider/core 契约，避免重复实现 |
 
 ## 3. 语言与框架约束
 

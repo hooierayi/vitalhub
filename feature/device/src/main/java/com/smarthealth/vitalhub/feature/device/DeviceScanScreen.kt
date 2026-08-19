@@ -32,6 +32,7 @@ fun DeviceScanScreen(state: DeviceScanUiState, onProjectOnlyChanged: (Boolean) -
             Icon(Icons.Default.Refresh, "刷新", tint = VitalColors.TextSecondary, modifier = Modifier.size(21.dp).clickable(onClick = onRefresh))
         }
         visibleDevices.forEach { DeviceCard(it) { onConnect(it.id) } }
+        state.flowError?.let { Text(it, color = VitalColors.Danger, fontSize = 14.sp) }
         SectionTitle("其他设备", top = 16.dp)
         Text("未发现其他设备", Modifier.fillMaxWidth().padding(top = 21.dp), textAlign = TextAlign.Center, fontSize = 14.sp, color = VitalColors.TextSecondary)
         Spacer(Modifier.weight(1f)); Box(Modifier.fillMaxWidth().height(1.dp).background(VitalColors.Border))

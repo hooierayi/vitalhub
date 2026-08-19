@@ -2,8 +2,8 @@ package com.smarthealth.vitalhub.feature.collection
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import com.smarthealth.vitalhub.core.navigation.CollectionMode
-import com.smarthealth.vitalhub.core.navigation.RouteArgs
+import com.smarthealth.vitalhub.core.navi.CollectionMode
+import com.smarthealth.vitalhub.core.navi.RouteArgs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +20,7 @@ data class CollectionUiState(
     val recordingElapsed: String = "02:36:18",
     val recordId: String = "REC20240521001",
     val startedAt: String = "2024-05-21  09:41:32",
+    val flowError: String? = null,
 )
 
 class CollectionViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
@@ -28,4 +29,8 @@ class CollectionViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         mode = savedStateHandle.get<String>(RouteArgs.COLLECTION_MODE) ?: CollectionMode.PREVIEW,
     ))
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
+
+    fun reportFlowError() {
+        _uiState.value = _uiState.value.copy(flowError = "采集流程暂不可用，请稍后重试")
+    }
 }

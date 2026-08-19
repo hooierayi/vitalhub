@@ -2,7 +2,7 @@ package com.smarthealth.vitalhub.feature.device
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import com.smarthealth.vitalhub.core.navigation.RouteArgs
+import com.smarthealth.vitalhub.core.navi.RouteArgs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +14,7 @@ data class DeviceScanUiState(
     val projectOnly: Boolean = true,
     val devices: List<ScannedDevice> = emptyList(),
     val connectedDeviceId: String? = null,
+    val flowError: String? = null,
 )
 
 class DeviceScanViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
@@ -24,4 +25,5 @@ class DeviceScanViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     fun setProjectOnly(enabled: Boolean) { _uiState.value = _uiState.value.copy(projectOnly = enabled) }
     fun refresh() { _uiState.value = _uiState.value.copy(scanning = true, devices = sampleDevices) }
     fun connect(deviceId: String) { _uiState.value = _uiState.value.copy(scanning = false, connectedDeviceId = deviceId) }
+    fun reportFlowError() { _uiState.value = _uiState.value.copy(flowError = "采集流程暂不可用，请稍后重试") }
 }

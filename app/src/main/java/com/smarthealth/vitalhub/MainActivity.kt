@@ -6,6 +6,7 @@ import android.view.View
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -14,11 +15,18 @@ import androidx.fragment.app.FragmentManager
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModelProvider
-import com.smarthealth.vitalhub.core.navigation.BottomNavigationDestination
-import com.smarthealth.vitalhub.core.navigation.BottomNavigationKeys
-import com.smarthealth.vitalhub.core.navigation.AppBarDestination
-import com.smarthealth.vitalhub.core.navigation.FlowNavigationHost
-import com.smarthealth.vitalhub.core.navigation.Navigator
+import com.smarthealth.vitalhub.core.navi.AppBarDestination
+import com.smarthealth.vitalhub.core.navi.BottomNavigationDestination
+import com.smarthealth.vitalhub.core.navi.BottomNavigationKeys
+import com.smarthealth.vitalhub.core.navi.FlowBackAction
+import com.smarthealth.vitalhub.core.navi.FlowBackPolicy
+import com.smarthealth.vitalhub.core.navi.FlowDestination
+import com.smarthealth.vitalhub.core.navi.FlowDestinationOwner
+import com.smarthealth.vitalhub.core.navi.FlowNavigationHost
+import com.smarthealth.vitalhub.core.navi.FlowNavigationGate
+import com.smarthealth.vitalhub.core.navi.FlowNavigationRequest
+import com.smarthealth.vitalhub.core.navi.FlowNavigationResult
+import com.smarthealth.vitalhub.core.navi.Navigator
 import com.smarthealth.vitalhub.core.ui.VitalHubTheme
 
 /** The only Activity. It owns the root navigation chrome and the Fragment back stack. */
@@ -26,11 +34,13 @@ class MainActivity : AppCompatActivity(), FlowNavigationHost {
     private val viewModel by lazy { ViewModelProvider(this)[AppShellViewModel::class.java] }
     private lateinit var bottomBar: ComposeView
     private var bottomBarTargetVisible = true
+    private val navigationGate = FlowNavigationGate()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         configureEdgeToEdgeWindow()
         setContentView(createRootView())
+        configureFlowBackNavigation()
         observeVisibleFragment()
         if (savedInstanceState == null) Navigator.home(this)
     }
@@ -88,7 +98,56 @@ class MainActivity : AppCompatActivity(), FlowNavigationHost {
         if (key == viewModel.uiState.value.selectedBottomKey && supportFragmentManager.backStackEntryCount == 0) return
         when (key) {
             BottomNavigationKeys.COLLECTION -> Navigator.home(this)
-            else -> show(AppSectionFragment.newInstance(key), addToBackStack = false, clearBackStack = true)
+            else -> show(
+                FlowNavigationRequest(
+                    key = "section|$key",
+                    fragment = AppSectionFragment.newInstance(key),
+                    addToBackStack = false,
+                    clearBackStack = true,
+                ),
+            )
+        }
+    }
+
+    /** Keeps flow-specific back behavior consistent for both the system and app-bar buttons. */
+    private fun configureFlowBackNavigation() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val fragment = supportFragmentManager.findFragmentById(R.id.main_fragment_container)
+                val context = (fragment as? FlowDestinationOwner)?.flowDestinationContext
+                when (val action = FlowBackPolicy.resolve(context?.destination)) {
+                    FlowBackAction.ReturnHome -> Navigator.home(this@MainActivity, clearBackStack = true)
+                    is FlowBackAction.PopTo -> context?.sessionId?.let { sessionId ->
+                        returnToFlowDestination(sessionId, action.destination)
+                    } ?: run {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                        isEnabled = true
+                    }
+                    FlowBackAction.DelegateToBackStack -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                        isEnabled = true
+                    }
+                }
+            }
+        })
+    }
+
+    /** Pops nested flow screens to the target destination, with an ARouter fallback after stack loss. */
+    private fun returnToFlowDestination(sessionId: String, target: FlowDestination) {
+        while (true) {
+            val context = (supportFragmentManager
+                .findFragmentById(R.id.main_fragment_container)
+                as? FlowDestinationOwner)
+                ?.flowDestinationContext
+            if (context?.sessionId == sessionId && context.destination == target) {
+                return
+            }
+            if (!supportFragmentManager.popBackStackImmediate()) {
+                Navigator.flow(this, sessionId, target)
+                return
+            }
         }
     }
 
@@ -97,31 +156,43 @@ class MainActivity : AppCompatActivity(), FlowNavigationHost {
             object : FragmentManager.FragmentLifecycleCallbacks() {
                 override fun onFragmentResumed(fm: FragmentManager, fragment: Fragment) {
                     updateChrome(fragment, animateBottomBar = true)
+                    // A FragmentTransaction added to the back stack cannot use
+                    // runOnCommit. Resuming the replacement Fragment is the first
+                    // lifecycle point at which this transaction is complete.
+                    fragment.tag?.let(navigationGate::finish)
                 }
             },
             false,
         )
     }
 
-    override fun show(fragment: Fragment, addToBackStack: Boolean, clearBackStack: Boolean) {
-        if (clearBackStack) {
+    override fun show(request: FlowNavigationRequest): FlowNavigationResult {
+        val navigationResult = navigationGate.begin(request.key)
+        if (navigationResult != FlowNavigationResult.Navigated) return navigationResult
+        if (request.clearBackStack) {
             supportFragmentManager.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
         }
         // Update the app chrome before replacing the content. The old implementation
         // hid the bottom bar while both fragments were fading through transparency,
         // briefly exposing the window background as a black frame.
-        updateChrome(fragment, animateBottomBar = true)
-        supportFragmentManager.beginTransaction()
-            .setReorderingAllowed(true)
-            .setCustomAnimations(
-                android.R.anim.fade_in,
-                android.R.anim.fade_out,
-                android.R.anim.fade_in,
-                android.R.anim.fade_out,
-            )
-            .replace(R.id.main_fragment_container, fragment, fragment.javaClass.name)
-            .apply { if (addToBackStack) addToBackStack(fragment.javaClass.name) }
-            .commit()
+        updateChrome(request.fragment, animateBottomBar = true)
+        return try {
+            supportFragmentManager.beginTransaction()
+                .setReorderingAllowed(true)
+                .setCustomAnimations(
+                    android.R.anim.fade_in,
+                    android.R.anim.fade_out,
+                    android.R.anim.fade_in,
+                    android.R.anim.fade_out,
+                )
+                .replace(R.id.main_fragment_container, request.fragment, request.key)
+                .apply { if (request.addToBackStack) addToBackStack(request.key) }
+                .commit()
+            FlowNavigationResult.Navigated
+        } catch (error: Throwable) {
+            navigationGate.finish(request.key)
+            throw error
+        }
     }
 
     private fun updateChrome(fragment: Fragment, animateBottomBar: Boolean = false) {

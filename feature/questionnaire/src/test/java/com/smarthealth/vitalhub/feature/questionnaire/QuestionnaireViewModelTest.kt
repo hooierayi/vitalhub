@@ -1,8 +1,8 @@
 package com.smarthealth.vitalhub.feature.questionnaire
 
 import androidx.lifecycle.SavedStateHandle
-import com.smarthealth.vitalhub.core.navigation.QuestionnairePhase
-import com.smarthealth.vitalhub.core.navigation.RouteArgs
+import com.smarthealth.vitalhub.core.navi.QuestionnairePhase
+import com.smarthealth.vitalhub.core.navi.RouteArgs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

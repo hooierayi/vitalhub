@@ -25,6 +25,7 @@ kapt {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:navi"))
     implementation(project(":core:storage"))
     implementation(project(":provider:user"))
     implementation(platform(libs.compose.bom))

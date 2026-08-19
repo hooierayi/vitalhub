@@ -23,6 +23,7 @@ kapt {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:navi"))
     implementation(project(":provider:collection"))
     implementation(platform(libs.compose.bom))
     implementation(libs.arouter.api)

@@ -6,7 +6,7 @@ import com.smarthealth.vitalhub.core.storage.KVStorage
 import com.smarthealth.vitalhub.core.storage.Storage
 import com.smarthealth.vitalhub.core.storage.StorageBackend
 import com.smarthealth.vitalhub.core.storage.StorageOptions
-import com.smarthealth.vitalhub.core.navigation.Routes
+import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.provider.user.Gender
 import com.smarthealth.vitalhub.provider.user.UserInfo
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider

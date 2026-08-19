@@ -2,7 +2,7 @@ package com.smarthealth.vitalhub.feature.analysis
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import com.smarthealth.vitalhub.core.navigation.RouteArgs
+import com.smarthealth.vitalhub.core.navi.RouteArgs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

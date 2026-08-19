@@ -17,6 +17,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:navi"))
     implementation(libs.arouter.api)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit)

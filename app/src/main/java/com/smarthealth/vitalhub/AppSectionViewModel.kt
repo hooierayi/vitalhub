@@ -2,7 +2,7 @@ package com.smarthealth.vitalhub
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import com.smarthealth.vitalhub.core.navigation.BottomNavigationKeys
+import com.smarthealth.vitalhub.core.navi.BottomNavigationKeys
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

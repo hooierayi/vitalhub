@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.smarthealth.vitalhub.core.navigation.CollectionMode
+import com.smarthealth.vitalhub.core.navi.CollectionMode
 import com.smarthealth.vitalhub.core.ui.*
 
 @Composable
@@ -32,6 +32,7 @@ fun CollectionScreen(state: CollectionUiState, onStartClip: () -> Unit, onStartC
 private fun PreviewPage(state: CollectionUiState, onStartClip: () -> Unit, onStartContinuous: () -> Unit) {
     FlowPage(scrollable = false) {
         ConnectedBanner(state.device); Waveform("ECG", "增益：10 mm/mV", height = 95.dp); Waveform("RESP", "阻抗", true, 95.dp); Spacer(Modifier.height(14.dp))
+        state.flowError?.let { Text(it, color = VitalColors.Danger, fontSize = 14.sp) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             state.metrics.forEachIndexed { index, metric -> MetricCard(metric.name, metric.value, metric.unit, if (index == 0) VitalColors.Success else if (index == 1) VitalColors.Blue else VitalColors.Teal) }
             MetricCard("电量", state.device.battery.toString(), "%", VitalColors.Success)
@@ -49,6 +50,7 @@ private fun PreviewPage(state: CollectionUiState, onStartClip: () -> Unit, onSta
 private fun ClipPage(state: CollectionUiState, onStop: () -> Unit) {
     FlowPage(scrollable = false) {
         Text("正在采集 2 分钟片段", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary)
+        state.flowError?.let { Text(it, color = VitalColors.Danger, fontSize = 14.sp) }
         Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(state.clipProgress, Modifier.size(121.dp), color = VitalColors.Teal, trackColor = Color(0xFFECEFF2), strokeWidth = 9.dp)
             Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(state.clipElapsed, fontSize = 29.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary); Text("02:00", fontSize = 13.sp, color = VitalColors.TextSecondary) }
@@ -62,6 +64,7 @@ private fun ClipPage(state: CollectionUiState, onStop: () -> Unit) {
 @Composable
 private fun ContinuousPage(state: CollectionUiState, onClip: () -> Unit, onFinish: () -> Unit) {
     FlowPage(scrollable = false) {
+        state.flowError?.let { Text(it, color = VitalColors.Danger, fontSize = 14.sp) }
         InfoCard(background = Color(0xFFF5FBF9), padding = PaddingValues(17.dp), spacing = 0.dp) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(15.dp).background(VitalColors.Success, CircleShape)); Text("记录中", Modifier.padding(start = 10.dp), fontSize = 21.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary) }
             Text(state.recordingElapsed, Modifier.fillMaxWidth().padding(vertical = 14.dp), textAlign = TextAlign.Center, fontSize = 37.sp, fontWeight = FontWeight.Medium, color = Color.Black)

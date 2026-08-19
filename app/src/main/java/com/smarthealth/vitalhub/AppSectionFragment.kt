@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.smarthealth.vitalhub.core.navigation.*
+import com.smarthealth.vitalhub.core.navi.*
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
 
 class AppSectionFragment : BaseFlowFragment(), BottomNavigationDestination, AppBarDestination {

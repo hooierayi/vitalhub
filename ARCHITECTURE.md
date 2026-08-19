@@ -5,6 +5,7 @@
 ```text
 app
  └─ MainActivity（唯一 Activity / Fragment 宿主）
+     ├─ core:navi
      ├─ feature:home ────────► provider:user
      │                    └─► provider:collection
      ├─ feature:user ────────► provider:user
@@ -12,24 +13,25 @@ app
      ├─ feature:device ─────────► provider:collection
      ├─ feature:collection ─────► provider:collection
      └─ feature:analysis
-           └──────────► core:common
+core:navi ◄──────────── app、provider 与所有 feature
 feature:user ──────────► core:storage
 ```
 
 - `app`：应用壳、唯一 `MainActivity`、Compose 底部导航、Fragment 返回栈和 ARouter 初始化。
-- `core:common`：路由契约、跨模块模型、Compose 主题与公共组件；不依赖任何业务模块。
+- `core:common`：跨模块通用模型、Compose 主题与公共组件；不依赖任何业务模块。
+- `core:navi`：ARouter 路径与参数、`Navigator`、Fragment 导航宿主契约、流程返回策略与导航去重；不依赖业务 feature。
 - `core:storage`：可复用的本地键值存储，提供 SharedPreferences/MMKV 后端、批量编辑和可选 Android Keystore 加密。
 - `provider:user`：用户资料模型和 ARouter Provider 契约。
-- `provider:collection`：首页采集流程的持久化进度模型和 ARouter Provider 契约。
+- `provider:collection`：首页采集流程检查点、事件与 ARouter Provider 契约。
 - `feature:home`：采集任务入口与任务列表。
 - `feature:user`：用户信息编辑页面，以及以 ARouter Provider 暴露的 MMKV `UserInfoProvider` 实现。
 - `feature:questionnaire`：采集前睡眠问卷、采集后热相关症状问卷。
 - `feature:device`：BLE 权限、扫描、连接及设备状态展示。
-- `feature:collection`：实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程进度的 MMKV Provider 实现。
+- `feature:collection`：实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程状态机的 MMKV Provider 实现。
 - `feature:analysis`：异步 AI 分析任务及结果。
 
 业务模块之间不得添加直接 Gradle 依赖。每个模块用 `@Route` 暴露 Fragment，
-跨模块跳转统一经过 `core:common` 中的 `Routes`、`RouteArgs` 与 `Navigator`。
+跨模块跳转统一经过 `core:navi` 中的 `Routes`、`RouteArgs` 与 `Navigator`。
 ARouter 负责发现和创建目标 Fragment，`MainActivity` 实现的 `FlowNavigationHost`
 负责 FragmentTransaction、动画和返回栈。
 
@@ -66,8 +68,11 @@ ARouter 负责发现和创建目标 Fragment，`MainActivity` 实现的 `FlowNav
 - `cmdSeq`：设备控制命令序号，用于 ACK/NACK、超时重试和幂等处理。
 
 首页采集流程固定为“采集前问卷、连接设备、开始采集、采集后问卷”四步。前问卷、
-设备连接、正常结束采集和后问卷提交依次使进度达到 1/4 至 4/4；设备或采集阶段
-中断后必须重新连接设备，因此回退到 1/4。AI 分析不属于首页流程，后问卷提交后直接返回首页。
+设备连接、正常结束采集和后问卷提交依次使进度达到 1/4 至 4/4。Provider 以事件 reducer
+处理检查点，重复事件保持当前或更后的进度，避免用户在上一级页面重新进入流程时被阻塞。
+设备连接与正在采集属于瞬态状态，应用恢复时回退到重新连接设备。实时预览是
+采集阶段的主页面；片段采集或连续记录使用系统返回或标题栏返回时都回到实时预览。采集后
+问卷使用系统返回或标题栏返回时回到首页。AI 分析不属于首页流程，后问卷提交后直接返回首页。
 
 ## 推荐的数据层边界
 

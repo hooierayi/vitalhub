@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.smarthealth.vitalhub.core.navigation.BottomNavigationKeys
+import com.smarthealth.vitalhub.core.navi.BottomNavigationKeys
 import com.smarthealth.vitalhub.core.ui.VitalColors
 
 private data class BottomItem(val key: String, val label: String, val icon: ImageVector)

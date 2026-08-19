@@ -10,7 +10,7 @@
 
 | 类型 | 路径/模块 | 说明 |
 |---|---|---|
-| 采集模式 | `:core:common` | `CollectionMode` 定义连续采集模式 |
+| 采集模式 | `:core:navi` | `CollectionMode` 定义连续采集模式 |
 | 业务边界 | `:feature:collection` | 负责连续记录场景 |
 | 架构证据 | `ARCHITECTURE.md` | 核心标识章节 |
 

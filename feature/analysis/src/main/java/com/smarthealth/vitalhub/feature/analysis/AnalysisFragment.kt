@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alibaba.android.arouter.facade.annotation.Route
-import com.smarthealth.vitalhub.core.navigation.AppBarDestination
-import com.smarthealth.vitalhub.core.navigation.Routes
+import com.smarthealth.vitalhub.core.navi.AppBarDestination
+import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
 
 @Route(path = Routes.ANALYSIS)
