@@ -23,6 +23,7 @@ feature:user ──────────► core:storage
 - `core:navi`：ARouter 路径与参数、`Navigator`、Fragment 导航宿主契约、流程返回策略与导航去重；不依赖业务 feature。
 - `core:permission`：可注入的运行时权限定义、统一检查/申请、端内拒绝兜底弹窗及应用设置页跳转；不依赖业务 feature。应用层注入权限、路由守卫、前台 Activity 来源和弹窗实现，具体权限声明由使用它的 feature Manifest 提供。
 - `core:storage`：可复用的本地键值存储，提供 SharedPreferences/MMKV 后端、批量编辑和可选 Android Keystore 加密。
+- `foundation:bluetooth`：可复用的经典蓝牙与 BLE 基础组件，提供扫描、连接、读写及事件回调能力。
 - `provider:user`：用户资料模型和 ARouter Provider 契约。
 - `provider:collection`：首页采集流程检查点、事件与 ARouter Provider 契约。
 - `feature:home`：采集任务入口与任务列表。
