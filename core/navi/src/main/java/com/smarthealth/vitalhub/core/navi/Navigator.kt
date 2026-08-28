@@ -2,6 +2,7 @@ package com.smarthealth.vitalhub.core.navi
 
 import androidx.fragment.app.Fragment
 import com.alibaba.android.arouter.launcher.ARouter
+import android.content.Context
 
 object Navigator {
     fun home(host: FlowNavigationHost, clearBackStack: Boolean = true): FlowNavigationResult =
@@ -49,12 +50,23 @@ object Navigator {
         sessionId?.let { postcard.withString(RouteArgs.SESSION_ID, it) }
         phase?.let { postcard.withString(RouteArgs.QUESTIONNAIRE_PHASE, it) }
         mode?.let { postcard.withString(RouteArgs.COLLECTION_MODE, it) }
-        val fragment = requireNotNull(postcard.navigation() as? Fragment) {
+        val key = listOf(path, sessionId.orEmpty(), phase.orEmpty(), mode.orEmpty()).joinToString("|")
+        if (RouteInterceptionPolicy.requiresInterception(path)) {
+            val context = host as? Context
+                ?: error("FlowNavigationHost must also be a Context.")
+            postcard
+                .withString(RouteArgs.NAVIGATION_KEY, key)
+                .withBoolean(RouteArgs.ADD_TO_BACK_STACK, addToBackStack)
+                .withBoolean(RouteArgs.CLEAR_BACK_STACK, clearBackStack)
+                .navigation(context)
+            return FlowNavigationResult.Navigated
+        }
+        val fragment = requireNotNull(postcard.greenChannel().navigation() as? Fragment) {
             "ARouter route did not resolve to Fragment: $path"
         }
         return host.show(
             FlowNavigationRequest(
-                key = listOf(path, sessionId.orEmpty(), phase.orEmpty(), mode.orEmpty()).joinToString("|"),
+                key = key,
                 fragment = fragment,
                 addToBackStack = addToBackStack,
                 clearBackStack = clearBackStack,

@@ -6,6 +6,7 @@
 app
  └─ MainActivity（唯一 Activity / Fragment 宿主）
      ├─ core:navi
+     ├─ core:permission
      ├─ feature:home ────────► provider:user
      │                    └─► provider:collection
      ├─ feature:user ────────► provider:user
@@ -20,13 +21,14 @@ feature:user ──────────► core:storage
 - `app`：应用壳、唯一 `MainActivity`、Compose 底部导航、Fragment 返回栈和 ARouter 初始化。
 - `core:common`：跨模块通用模型、Compose 主题与公共组件；不依赖任何业务模块。
 - `core:navi`：ARouter 路径与参数、`Navigator`、Fragment 导航宿主契约、流程返回策略与导航去重；不依赖业务 feature。
+- `core:permission`：可注入的运行时权限定义、统一检查/申请、端内拒绝兜底弹窗及应用设置页跳转；不依赖业务 feature。应用层注入权限、路由守卫、前台 Activity 来源和弹窗实现，具体权限声明由使用它的 feature Manifest 提供。
 - `core:storage`：可复用的本地键值存储，提供 SharedPreferences/MMKV 后端、批量编辑和可选 Android Keystore 加密。
 - `provider:user`：用户资料模型和 ARouter Provider 契约。
 - `provider:collection`：首页采集流程检查点、事件与 ARouter Provider 契约。
 - `feature:home`：采集任务入口与任务列表。
 - `feature:user`：用户信息编辑页面，以及以 ARouter Provider 暴露的 MMKV `UserInfoProvider` 实现。
 - `feature:questionnaire`：采集前睡眠问卷、采集后热相关症状问卷。
-- `feature:device`：BLE 权限、扫描、连接及设备状态展示。
+- `feature:device`：BLE 扫描、连接及设备状态展示；运行时权限由应用层注入并在路由进入前处理。
 - `feature:collection`：实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程状态机的 MMKV Provider 实现。
 - `feature:analysis`：异步 AI 分析任务及结果。
 

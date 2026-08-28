@@ -113,6 +113,7 @@
 | `:app` | Application、唯一 Activity、应用壳与顶级导航 | 组装层 | 根 `AGENTS.md` |
 | `:core:common` | 跨模块通用模型与公共 UI | 基础层 | 根 `AGENTS.md` |
 | `:core:navi` | 路由契约、导航宿主接口、返回策略与导航去重 | 基础层 | 根 `AGENTS.md` |
+| `:core:permission` | 可注入的运行时权限契约、检查、申请、端内兜底弹窗与设置页跳转 | 基础层 | 根 `AGENTS.md` |
 | `:core:storage` | 通用键值存储抽象及 SharedPreferences/MMKV 实现 | 基础层 | 根 `AGENTS.md` |
 | `:provider:user` | 用户资料的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:collection` | 采集流程进度的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |

@@ -5,6 +5,9 @@
 - `VitalHubApplication` 初始化 ARouter；仅在 debuggable 应用中开启 ARouter 日志和调试。
 - `MainActivity` 是唯一 Activity，负责 edge-to-edge 窗口、应用标题栏、底部导航和 Fragment 返回栈。
 - feature 的 Fragment 通过 `@Route` 提供 ARouter 入口，并以 `ComposeView` 承载业务界面。
+- 需要运行时权限的 Fragment 路由由 app 层 `PermissionRouteInterceptor` 统一守卫。权限定义、
+ 受保护路径和弹窗实现均在应用组装时注入 `:core:permission`；feature 只在 Manifest 声明权限，
+ 不能在页面内直接申请。
 
 ## 2. 路由契约
 
@@ -44,3 +47,5 @@
 - ARouter Provider 变更还需确认各 Android 模块的 KAPT 配置、生成路由表与 release 混淆保留规则，否则服务可能仅在发布版不可用。
 - Fragment 是否实现顶级/标题栏接口会直接改变底栏与标题栏可见性。
 - 调整系统栏、过渡动画或返回栈需要在真实设备上验证页面切换和系统返回。
+- 受保护的 Fragment 路由经 ARouter 异步拦截后由 `FlowNavigationHost` 提交事务；修改拦截逻辑时需
+  验证授权、拒绝、设置页返回和重复导航均不会丢失或重复展示页面。

@@ -23,6 +23,7 @@ rootProject.name = "VitalHubApplication"
 include(":app")
 include(":core:common")
 include(":core:navi")
+include(":core:permission")
 include(":core:storage")
 include(":provider:user")
 include(":provider:collection")

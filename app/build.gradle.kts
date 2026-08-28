@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.jetbrains.kotlin.kapt)
 }
 
 android {
@@ -37,9 +38,14 @@ android {
     composeOptions { kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get() }
 }
 
+kapt {
+    arguments { arg("AROUTER_MODULE_NAME", project.name) }
+}
+
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:navi"))
+    implementation(project(":core:permission"))
     implementation(project(":feature:home"))
     implementation(project(":feature:user"))
     implementation(project(":feature:questionnaire"))
@@ -61,6 +67,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    kapt(libs.arouter.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

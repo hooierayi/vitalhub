@@ -21,14 +21,17 @@ class DeviceScanFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
     @Composable
     override fun ScreenContent() {
         val state = viewModel.uiState.collectAsStateWithLifecycle().value
-        DeviceScanScreen(state, viewModel::setProjectOnly, viewModel::refresh) { deviceId ->
-            val transition = dispatchFlowEvent(state.sessionId)
-            if (transition is CollectionFlowTransition.Applied || transition is CollectionFlowTransition.AlreadyApplied) {
-                viewModel.connect(deviceId)
-                Navigator.flow(requireActivity() as FlowNavigationHost, state.sessionId, requireNotNull(transition.nextDestination))
-            } else {
-                viewModel.reportFlowError()
-            }
+        DeviceScanScreen(state, viewModel::setProjectOnly, viewModel::refresh, ::continueDeviceConnection)
+    }
+
+    private fun continueDeviceConnection(deviceId: String) {
+        val sessionId = viewModel.uiState.value.sessionId
+        val transition = dispatchFlowEvent(sessionId)
+        if (transition is CollectionFlowTransition.Applied || transition is CollectionFlowTransition.AlreadyApplied) {
+            viewModel.connect(deviceId)
+            Navigator.flow(requireActivity() as FlowNavigationHost, sessionId, requireNotNull(transition.nextDestination))
+        } else {
+            viewModel.reportFlowError()
         }
     }
 
