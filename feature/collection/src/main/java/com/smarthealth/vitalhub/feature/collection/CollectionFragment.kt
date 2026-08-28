@@ -37,24 +37,28 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         CollectionScreen(
             state,
             onStartClip = {
-                Navigator.flow(host, state.sessionId, FlowDestination.CLIP_COLLECTION)
+                Navigator.collection(host, state.sessionId, FlowDestination.CLIP_COLLECTION)
             },
             onStartContinuous = {
-                Navigator.flow(host, state.sessionId, FlowDestination.CONTINUOUS_RECORDING)
+                Navigator.collection(host, state.sessionId, FlowDestination.CONTINUOUS_RECORDING)
             },
-            onStopClip = { finishCollection(state.sessionId, host) },
-            onFinishContinuous = { finishCollection(state.sessionId, host) },
+            onStopClip = { finishCollection(state.sessionId) },
+            onFinishContinuous = { finishCollection(state.sessionId) },
         )
     }
 
-    private fun finishCollection(sessionId: String, host: FlowNavigationHost) {
+    private fun finishCollection(sessionId: String) {
         val transition = runCatching {
             ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
                 ?.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
         }.getOrNull()
         when (transition) {
             is CollectionFlowTransition.Applied,
-            is CollectionFlowTransition.AlreadyApplied -> Navigator.flow(host, sessionId, requireNotNull(transition.nextDestination))
+            is CollectionFlowTransition.AlreadyApplied -> Navigator.flow(
+                requireContext(),
+                sessionId,
+                requireNotNull(transition.nextDestination),
+            )
             else -> viewModel.reportFlowError()
         }
     }

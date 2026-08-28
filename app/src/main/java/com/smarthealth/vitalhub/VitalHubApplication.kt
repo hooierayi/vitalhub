@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Application
 import android.content.pm.ApplicationInfo
 import com.alibaba.android.arouter.launcher.ARouter
-import com.smarthealth.vitalhub.core.navi.RouteInterceptionPolicy
 import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.permission.PermissionManager
 import com.smarthealth.vitalhub.core.permission.PermissionServiceInitConfig
@@ -37,12 +36,9 @@ class VitalHubApplication : Application() {
                         },
                     ),
                 ),
-                routePermissions = mapOf(Routes.DEVICE to DEVICE_BLUETOOTH_PERMISSION),
+                routePermissions = mapOf(Routes.COLLECTION_FLOW to DEVICE_BLUETOOTH_PERMISSION),
             ),
         )
-        RouteInterceptionPolicy.configure { routePath ->
-            PermissionManager.permissionForRoute(routePath) != null
-        }
     }
 
     private companion object {

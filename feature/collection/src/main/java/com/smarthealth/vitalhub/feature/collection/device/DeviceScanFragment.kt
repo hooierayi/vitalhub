@@ -1,4 +1,4 @@
-package com.smarthealth.vitalhub.feature.device
+package com.smarthealth.vitalhub.feature.collection.device
 
 import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
@@ -29,7 +29,7 @@ class DeviceScanFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         val transition = dispatchFlowEvent(sessionId)
         if (transition is CollectionFlowTransition.Applied || transition is CollectionFlowTransition.AlreadyApplied) {
             viewModel.connect(deviceId)
-            Navigator.flow(requireActivity() as FlowNavigationHost, sessionId, requireNotNull(transition.nextDestination))
+            Navigator.collection(requireActivity() as FlowNavigationHost, sessionId, requireNotNull(transition.nextDestination))
         } else {
             viewModel.reportFlowError()
         }

@@ -17,25 +17,9 @@ data class FlowDestinationContext(
     val sessionId: String? = null,
 )
 
-/** Implemented by flow pages so the app shell can apply pure back-navigation policy. */
+/** Implemented by flow pages that expose their current collection-flow destination. */
 interface FlowDestinationOwner {
     val flowDestinationContext: FlowDestinationContext
-}
-
-sealed interface FlowBackAction {
-    data object DelegateToBackStack : FlowBackAction
-    data class PopTo(val destination: FlowDestination) : FlowBackAction
-    data object ReturnHome : FlowBackAction
-}
-
-/** Android-free policy for flow-specific back behavior. */
-object FlowBackPolicy {
-    fun resolve(destination: FlowDestination?): FlowBackAction = when (destination) {
-        FlowDestination.CLIP_COLLECTION,
-        FlowDestination.CONTINUOUS_RECORDING -> FlowBackAction.PopTo(FlowDestination.LIVE_PREVIEW)
-        FlowDestination.POST_QUESTIONNAIRE -> FlowBackAction.ReturnHome
-        else -> FlowBackAction.DelegateToBackStack
-    }
 }
 
 data class FlowNavigationRequest(

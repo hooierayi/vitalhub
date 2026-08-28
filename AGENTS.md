@@ -3,7 +3,7 @@
 ## 1. 项目定位
 
 - 项目职责：VitalHub 健康数据采集 Android 应用。
-- 主要工程形态：Kotlin、Jetpack Compose 与 Fragment 混合的多模块 Android 工程。
+- 主要工程形态：Kotlin、Jetpack Compose 与 Activity + Fragment 混合的多模块 Android 工程。
 - 本仓库负责：采集任务入口、问卷、BLE 设备连接、采集记录、异步分析，以及应用壳层导航。
 
 ## 2. Agent 工作准则
@@ -12,7 +12,7 @@
 
 - 先阅读本文件、`ARCHITECTURE.md` 与命中的 `docs/` 索引；涉及模块细节时再阅读对应 Gradle 文件、路由和入口代码。
 - 通过 `settings.gradle.kts` 和模块 `build.gradle.kts` 确认模块边界与依赖，不仅依据目录推断。
-- 变更路由、采集链路或用户资料时，先追踪 `Routes`、`Navigator`、`MainActivity` 和目标 Fragment/ViewModel。
+- 变更路由、采集链路或用户资料时，先追踪 `Routes`、`Navigator`、目标 Activity、Fragment 和 ViewModel。
 
 ### 修改中
 
@@ -26,7 +26,7 @@
 - Provider 的 `init(context)` 仅做轻量、线程安全的初始化且只保存 `applicationContext`；存储、Repository 等实现细节留在所属 feature 内创建。不得持有 `Activity`、`View` 或大对象，也不得执行网络/耗时 IO。跨模块回调使用 provider 中定义的接口，避免把 Lambda、页面对象或不可序列化状态塞入路由参数。
 - **跨模块数据传递按生命周期选型：**凡是可持久化、可由现有或新增 Provider 查询/恢复的业务数据（包括实体、状态标识和可推导的页面模式），目标模块必须通过 `ARouter.navigation(Provider::class.java)` 自行读取，禁止由上游通过路由参数转发。路由参数仅用于一次性、纯内存的导航上下文，且该上下文不能由 Provider 恢复或推导；设计前先检索可复用的 Provider。
 - 新增能力前先检索并优先复用现有 provider、common 或业务模块能力，避免重复实现；仅在能力具有稳定跨模块价值时新增 provider/common 契约。
-- 业务页面通过 Fragment 作为 ARouter 入口和生命周期容器，并以 `ComposeView` 承载 Compose UI；不要为新页面引入 XML/ViewBinding 路径。
+- 首页通过 Fragment 作为 ARouter 入口并由 `MainActivity` 承载；其他业务 feature 通过 Activity 作为跨模块 ARouter 入口、Fragment 作为内部页面和 Compose 生命周期容器。Activity 内部切换仍通过 ARouter 解析 Fragment，再由 Activity 提交事务；不要引入 XML/ViewBinding 页面路径。
 - 新增或实质改版业务页面时，默认遵循 `docs/coding_standards/visual-design.md` 的健康采集页风格，并以 **414dp 宽**作为设计与视觉验收基准。优先复用 `VitalHubTheme`、`VitalColors`、`FlowPage`、`InfoCard`、`FlowButton` 等公共 UI；布局仍须使用约束式、可伸缩的 Compose 写法，不能把 414dp 写成设备的固定页面宽度或造成窄屏裁切。
 - 不将尚未证实的 BLE 协议、数据持久化或服务端行为写成既有事实。
 
@@ -110,7 +110,7 @@
 
 | 模块 | 职责 | 依赖层级 | Agent 文档 |
 |---|---|---|---|
-| `:app` | Application、唯一 Activity、应用壳与顶级导航 | 组装层 | 根 `AGENTS.md` |
+| `:app` | Application、首页 Activity、应用壳与顶级导航 | 组装层 | 根 `AGENTS.md` |
 | `:core:common` | 跨模块通用模型与公共 UI | 基础层 | 根 `AGENTS.md` |
 | `:core:navi` | 路由契约、导航宿主接口、返回策略与导航去重 | 基础层 | 根 `AGENTS.md` |
 | `:core:permission` | 可注入的运行时权限契约、检查、申请、端内兜底弹窗与设置页跳转 | 基础层 | 根 `AGENTS.md` |
@@ -121,6 +121,5 @@
 | `:feature:home` | 采集任务入口与任务列表 | 业务 feature | 根 `AGENTS.md` |
 | `:feature:user` | 用户资料编辑与本地资料实现 | 业务 feature | `feature/user/AGENTS.md` |
 | `:feature:questionnaire` | 采集前后问卷 | 业务 feature | 根 `AGENTS.md` |
-| `:feature:device` | BLE 权限、扫描、连接与设备状态 | 业务 feature | 根 `AGENTS.md` |
-| `:feature:collection` | 实时预览、片段、连续记录与采集进度 Provider 实现 | 业务 feature | 根 `AGENTS.md` |
+| `:feature:collection` | BLE 权限、扫描、连接、实时预览、片段、连续记录与采集进度 Provider 实现 | 业务 feature | 根 `AGENTS.md` |
 | `:feature:analysis` | 异步分析任务及结果 | 业务 feature | 根 `AGENTS.md` |

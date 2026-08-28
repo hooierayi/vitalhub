@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:navi"))
     implementation(platform(libs.compose.bom))
+    implementation(libs.androidx.appcompat)
     implementation(libs.arouter.api)
     implementation(libs.compose.runtime)
     implementation(libs.compose.ui)

@@ -16,6 +16,14 @@
         <item name="android:colorBackground">@color/vital_background</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowAnimationStyle">@style/Animation.VitalHub.Activity</item>
         <!-- Customize your theme here. -->
+    </style>
+
+    <style name="Animation.VitalHub.Activity" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/flow_activity_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/flow_activity_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/flow_activity_close_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/flow_activity_close_exit</item>
     </style>
 </resources>

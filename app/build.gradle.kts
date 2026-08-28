@@ -49,7 +49,6 @@ dependencies {
     implementation(project(":feature:home"))
     implementation(project(":feature:user"))
     implementation(project(":feature:questionnaire"))
-    implementation(project(":feature:device"))
     implementation(project(":feature:collection"))
     implementation(project(":feature:analysis"))
     implementation(platform(libs.compose.bom))

@@ -10,7 +10,7 @@
 
 | 类型 | 路径/模块 | 说明 |
 |---|---|---|
-| 业务边界 | `:feature:device`、`:feature:collection` | 设备连接和采集可能消费命令状态 |
+| 业务边界 | `:feature:collection` | 设备连接和采集由同一业务域消费命令状态 |
 | 架构证据 | `ARCHITECTURE.md` | 核心标识章节 |
 
 ## 3. 相关功能文档

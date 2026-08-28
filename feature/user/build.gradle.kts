@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":core:storage"))
     implementation(project(":provider:user"))
     implementation(platform(libs.compose.bom))
+    implementation(libs.androidx.appcompat)
     implementation(libs.arouter.api)
     implementation(libs.compose.runtime)
     implementation(libs.compose.ui)

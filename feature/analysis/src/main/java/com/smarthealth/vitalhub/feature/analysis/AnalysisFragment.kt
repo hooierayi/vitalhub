@@ -8,7 +8,7 @@ import com.smarthealth.vitalhub.core.navi.AppBarDestination
 import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
 
-@Route(path = Routes.ANALYSIS)
+@Route(path = Routes.ANALYSIS_FRAGMENT)
 class AnalysisFragment : BaseFlowFragment(), AppBarDestination {
     private val viewModel by viewModels<AnalysisViewModel>()
     override val appBarTitle = "AI分析结果"

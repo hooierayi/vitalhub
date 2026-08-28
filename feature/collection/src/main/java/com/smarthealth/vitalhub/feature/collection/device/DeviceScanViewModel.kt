@@ -1,4 +1,4 @@
-package com.smarthealth.vitalhub.feature.device
+package com.smarthealth.vitalhub.feature.collection.device
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel

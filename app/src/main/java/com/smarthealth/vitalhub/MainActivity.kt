@@ -1,12 +1,12 @@
 package com.smarthealth.vitalhub
 
+import android.content.Intent
 import android.os.Bundle
 import android.graphics.Color
 import android.view.View
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -15,21 +15,20 @@ import androidx.fragment.app.FragmentManager
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModelProvider
+import com.alibaba.android.arouter.facade.annotation.Route
 import com.smarthealth.vitalhub.core.navi.AppBarDestination
 import com.smarthealth.vitalhub.core.navi.BottomNavigationDestination
 import com.smarthealth.vitalhub.core.navi.BottomNavigationKeys
-import com.smarthealth.vitalhub.core.navi.FlowBackAction
-import com.smarthealth.vitalhub.core.navi.FlowBackPolicy
-import com.smarthealth.vitalhub.core.navi.FlowDestination
-import com.smarthealth.vitalhub.core.navi.FlowDestinationOwner
 import com.smarthealth.vitalhub.core.navi.FlowNavigationHost
 import com.smarthealth.vitalhub.core.navi.FlowNavigationGate
 import com.smarthealth.vitalhub.core.navi.FlowNavigationRequest
 import com.smarthealth.vitalhub.core.navi.FlowNavigationResult
 import com.smarthealth.vitalhub.core.navi.Navigator
+import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.ui.VitalHubTheme
 
-/** The only Activity. It owns the root navigation chrome and the Fragment back stack. */
+/** Home Activity. It owns the root navigation chrome and the home Fragment stack. */
+@Route(path = Routes.APP_HOME)
 class MainActivity : AppCompatActivity(), FlowNavigationHost {
     private val viewModel by lazy { ViewModelProvider(this)[AppShellViewModel::class.java] }
     private lateinit var bottomBar: ComposeView
@@ -40,9 +39,14 @@ class MainActivity : AppCompatActivity(), FlowNavigationHost {
         super.onCreate(savedInstanceState)
         configureEdgeToEdgeWindow()
         setContentView(createRootView())
-        configureFlowBackNavigation()
         observeVisibleFragment()
         if (savedInstanceState == null) Navigator.home(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        Navigator.home(this, clearBackStack = true)
     }
 
     private fun createRootView(): View = LinearLayout(this).apply {
@@ -106,48 +110,6 @@ class MainActivity : AppCompatActivity(), FlowNavigationHost {
                     clearBackStack = true,
                 ),
             )
-        }
-    }
-
-    /** Keeps flow-specific back behavior consistent for both the system and app-bar buttons. */
-    private fun configureFlowBackNavigation() {
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                val fragment = supportFragmentManager.findFragmentById(R.id.main_fragment_container)
-                val context = (fragment as? FlowDestinationOwner)?.flowDestinationContext
-                when (val action = FlowBackPolicy.resolve(context?.destination)) {
-                    FlowBackAction.ReturnHome -> Navigator.home(this@MainActivity, clearBackStack = true)
-                    is FlowBackAction.PopTo -> context?.sessionId?.let { sessionId ->
-                        returnToFlowDestination(sessionId, action.destination)
-                    } ?: run {
-                        isEnabled = false
-                        onBackPressedDispatcher.onBackPressed()
-                        isEnabled = true
-                    }
-                    FlowBackAction.DelegateToBackStack -> {
-                        isEnabled = false
-                        onBackPressedDispatcher.onBackPressed()
-                        isEnabled = true
-                    }
-                }
-            }
-        })
-    }
-
-    /** Pops nested flow screens to the target destination, with an ARouter fallback after stack loss. */
-    private fun returnToFlowDestination(sessionId: String, target: FlowDestination) {
-        while (true) {
-            val context = (supportFragmentManager
-                .findFragmentById(R.id.main_fragment_container)
-                as? FlowDestinationOwner)
-                ?.flowDestinationContext
-            if (context?.sessionId == sessionId && context.destination == target) {
-                return
-            }
-            if (!supportFragmentManager.popBackStackImmediate()) {
-                Navigator.flow(this, sessionId, target)
-                return
-            }
         }
     }
 

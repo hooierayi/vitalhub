@@ -11,7 +11,7 @@ import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
 
-@Route(path = Routes.QUESTIONNAIRE)
+@Route(path = Routes.QUESTIONNAIRE_FRAGMENT)
 class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestinationOwner {
     private val viewModel by viewModels<QuestionnaireViewModel>()
 
@@ -55,7 +55,7 @@ class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestina
         when (transition) {
             is CollectionFlowTransition.Applied,
             is CollectionFlowTransition.AlreadyApplied -> Navigator.flow(
-                requireActivity() as FlowNavigationHost,
+                requireContext(),
                 sessionId,
                 requireNotNull(transition.nextDestination),
             )

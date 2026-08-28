@@ -10,7 +10,7 @@ import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 
-@Route(path = Routes.USER_INFO_EDIT)
+@Route(path = Routes.USER_INFO_EDIT_FRAGMENT)
 class UserInfoEditFragment : BaseFlowFragment(), AppBarDestination {
     private val viewModel by viewModels<UserInfoEditViewModel>()
     private val userInfoProvider: UserInfoProvider? by lazy {
