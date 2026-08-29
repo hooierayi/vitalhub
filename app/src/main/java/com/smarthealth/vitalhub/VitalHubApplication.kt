@@ -8,11 +8,20 @@ import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.permission.PermissionManager
 import com.smarthealth.vitalhub.core.permission.PermissionServiceInitConfig
 import com.smarthealth.vitalhub.core.permission.model.RuntimePermission
+import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKit
+import com.smarthealth.vitalhub.foundation.bluetooth.scan.BluetoothScanRulesConfig
 
 class VitalHubApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         registerActivityLifecycleCallbacks(CurrentActivityHolder)
+        BluetoothKit.Builder()
+            .setScanRulesConfig(
+                BluetoothScanRulesConfig.Builder()
+                    .setFilter { true }
+                    .build(),
+            )
+            .init()
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
             ARouter.openLog()
             ARouter.openDebug()

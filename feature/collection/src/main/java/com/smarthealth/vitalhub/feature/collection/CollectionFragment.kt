@@ -1,12 +1,15 @@
 package com.smarthealth.vitalhub.feature.collection
 
 import androidx.compose.runtime.Composable
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alibaba.android.arouter.facade.annotation.Route
 import com.alibaba.android.arouter.launcher.ARouter
 import com.smarthealth.vitalhub.core.navi.*
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
+import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProvider
+import com.smarthealth.vitalhub.feature.collection.shared.connectedDevice
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
@@ -14,6 +17,7 @@ import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
 @Route(path = Routes.COLLECTION)
 class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinationOwner {
     private val viewModel by viewModels<CollectionViewModel>()
+    private val collectionBluetoothProvider by activityViewModels<CollectionBluetoothProvider>()
     override val appBarTitle: String
         get() = when (arguments?.getString(RouteArgs.COLLECTION_MODE)) {
             CollectionMode.CLIP -> "片段采集中"
@@ -32,10 +36,15 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
 
     @Composable
     override fun ScreenContent() {
+        val bluetoothState = collectionBluetoothProvider.uiState.collectAsStateWithLifecycle().value
+        val connectedDevice = bluetoothState.connectedDevice()
         val state = viewModel.uiState.collectAsStateWithLifecycle().value
+        val displayedDevice = connectedDevice ?: bluetoothState.lastConnectedDevice
         val host = requireActivity() as FlowNavigationHost
         CollectionScreen(
-            state,
+            state = state,
+            device = displayedDevice,
+            isDeviceConnected = connectedDevice != null,
             onStartClip = {
                 Navigator.collection(host, state.sessionId, FlowDestination.CLIP_COLLECTION)
             },

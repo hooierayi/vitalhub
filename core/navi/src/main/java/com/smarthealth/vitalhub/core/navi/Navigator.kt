@@ -39,9 +39,9 @@ object Navigator {
     ): FlowNavigationResult = when (destination) {
         FlowDestination.DEVICE_CONNECTION -> fragment(
             host,
-            Routes.DEVICE,
+            Routes.COLLECTION_FLOW_HOME,
             bundleOf(RouteArgs.SESSION_ID to sessionId),
-            key = "${Routes.DEVICE}|$sessionId",
+            key = "${Routes.COLLECTION_FLOW_HOME}|$sessionId",
             addToBackStack = addToBackStack,
         )
         FlowDestination.LIVE_PREVIEW -> collectionPage(host, sessionId, CollectionMode.PREVIEW, addToBackStack)

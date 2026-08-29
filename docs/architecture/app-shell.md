@@ -19,7 +19,9 @@
 | 顶级导航标记 | `BottomNavigationDestination` | 顶级页面实现后，应用壳显示底栏 |
 | 标题栏元数据 | `AppBarDestination` | 页面通过接口声明标题和返回按钮，不重复绘制标题栏 |
 
-当前用户资料编辑 Activity 路由为 `/user/edit`，由 `:feature:user` 的 `UserActivity` 注册；内部 Fragment 路由为 `/user/edit/content`。采集 Activity 路由为 `/collection/flow`，内部设备和采集 Fragment 分别为 `/device/scan` 与 `/collection/main`。首页四步采集流程由 `CollectionFlowProvider` 的 `/collection/flow/service` 服务读取和更新。
+当前用户资料编辑 Activity 路由为 `/user/edit`，由 `:feature:user` 的 `UserActivity` 注册；内部 Fragment 路由为 `/user/edit/content`。采集 Activity 路由为 `/collection/flow`，内部采集流程首页和采集 Fragment 分别为 `/collection/flow/home` 与 `/collection/main`。首页四步采集流程由 `CollectionFlowProvider` 的 `/collection/flow/service` 服务读取和更新。
+
+业务 Activity 内进入二级 Fragment 时，将当前页面隐藏并压入 Fragment 返回栈，而不是通过 `replace` 销毁其 View；返回时恢复原 Fragment、ViewModel 与 Compose 状态，避免采集流程首页重新扫描或丢失已展示设备。
 
 ### Provider 服务边界
 

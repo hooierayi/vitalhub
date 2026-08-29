@@ -118,6 +118,7 @@
 | `:foundation:bluetooth` | 经典蓝牙与 BLE 的扫描、连接、读写及事件回调基础能力 | 基础层 | 根 `AGENTS.md` |
 | `:provider:user` | 用户资料的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:collection` | 采集流程进度的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
+| `:provider:device` | 最近成功连接设备的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:feature:home` | 采集任务入口与任务列表 | 业务 feature | 根 `AGENTS.md` |
 | `:feature:user` | 用户资料编辑与本地资料实现 | 业务 feature | `feature/user/AGENTS.md` |
 | `:feature:questionnaire` | 采集前后问卷 | 业务 feature | 根 `AGENTS.md` |

@@ -19,7 +19,7 @@ class CollectionFlowActivity : BaseFlowActivity() {
     }
 
     override val initialFragmentPath: String
-        get() = if (initialDestination == FlowDestination.DEVICE_CONNECTION) Routes.DEVICE else Routes.COLLECTION
+        get() = if (initialDestination == FlowDestination.DEVICE_CONNECTION) Routes.COLLECTION_FLOW_HOME else Routes.COLLECTION
 
     override val initialNavigationKey: String
         get() = "$initialFragmentPath|${intent.getStringExtra(RouteArgs.SESSION_ID).orEmpty()}|${initialDestination.name}"

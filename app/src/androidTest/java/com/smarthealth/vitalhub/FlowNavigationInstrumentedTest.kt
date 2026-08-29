@@ -23,6 +23,7 @@ import com.smarthealth.vitalhub.feature.analysis.AnalysisActivity
 import com.smarthealth.vitalhub.feature.questionnaire.QuestionnaireActivity
 import com.smarthealth.vitalhub.feature.user.UserActivity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,6 +81,9 @@ class FlowNavigationInstrumentedTest {
                 val fragments = activity.supportFragmentManager
                 fragments.executePendingTransactions()
                 assertDestination(activity, FlowDestination.LIVE_PREVIEW)
+                val originalFragment = fragments.findFragmentById(
+                    com.smarthealth.vitalhub.core.navi.R.id.flow_fragment_container,
+                )
 
                 assertEquals(
                     FlowNavigationResult.Navigated,
@@ -95,6 +99,10 @@ class FlowNavigationInstrumentedTest {
                 activity.onBackPressedDispatcher.onBackPressed()
                 fragments.executePendingTransactions()
                 assertDestination(activity, FlowDestination.LIVE_PREVIEW)
+                assertSame(
+                    originalFragment,
+                    fragments.findFragmentById(com.smarthealth.vitalhub.core.navi.R.id.flow_fragment_container),
+                )
             }
         }
     }

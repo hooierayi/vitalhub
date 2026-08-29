@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.Lifecycle
 import com.smarthealth.vitalhub.core.ui.FlowTitleBar
 import com.smarthealth.vitalhub.core.ui.VitalHubTheme
 
@@ -122,7 +123,7 @@ abstract class BaseFlowActivity : AppCompatActivity(), FlowNavigationHost {
         }
         updateAppBar(request.fragment)
         return try {
-            supportFragmentManager.beginTransaction()
+            val transaction = supportFragmentManager.beginTransaction()
                 .setReorderingAllowed(true)
                 .setCustomAnimations(
                     android.R.anim.fade_in,
@@ -130,9 +131,22 @@ abstract class BaseFlowActivity : AppCompatActivity(), FlowNavigationHost {
                     android.R.anim.fade_in,
                     android.R.anim.fade_out,
                 )
-                .replace(R.id.flow_fragment_container, request.fragment, request.key)
-                .apply { if (request.addToBackStack) addToBackStack(request.key) }
-                .commit()
+            if (request.addToBackStack) {
+                supportFragmentManager.findFragmentById(R.id.flow_fragment_container)?.let { current ->
+                    transaction
+                        .setMaxLifecycle(current, Lifecycle.State.STARTED)
+                        .hide(current)
+                }
+                transaction
+                    .add(R.id.flow_fragment_container, request.fragment, request.key)
+                    .setPrimaryNavigationFragment(request.fragment)
+                    .addToBackStack(request.key)
+            } else {
+                transaction
+                    .replace(R.id.flow_fragment_container, request.fragment, request.key)
+                    .setPrimaryNavigationFragment(request.fragment)
+            }
+            transaction.commit()
             FlowNavigationResult.Navigated
         } catch (error: Throwable) {
             navigationGate.finish(request.key)
