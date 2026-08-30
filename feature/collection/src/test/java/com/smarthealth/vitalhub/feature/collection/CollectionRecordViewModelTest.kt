@@ -6,6 +6,7 @@ import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.provider.record.RecordType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CollectionRecordViewModelTest {
@@ -34,4 +35,22 @@ class CollectionRecordViewModelTest {
         assertEquals("user-fingerprint", record?.userFingerprint)
         assertEquals("AA:BB:CC:DD:EE:FF", record?.deviceAddress)
     }
+
+    @Test
+    fun `record id prefix identifies the collection mode`() {
+        val clipViewModel = viewModelFor(CollectionMode.CLIP)
+        val continuousViewModel = viewModelFor(CollectionMode.CONTINUOUS)
+
+        assertTrue(clipViewModel.uiState.value.recordId.matches(Regex("CLIP-[0-9a-f]{12}")))
+        assertTrue(continuousViewModel.uiState.value.recordId.matches(Regex("CONT-[0-9a-f]{12}")))
+    }
+
+    private fun viewModelFor(mode: String) = CollectionViewModel(
+        SavedStateHandle(
+            mapOf(
+                RouteArgs.COLLECTION_MODE to mode,
+                RouteArgs.SESSION_ID to "session-prefix-test",
+            ),
+        ),
+    )
 }

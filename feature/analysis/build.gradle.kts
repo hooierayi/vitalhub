@@ -27,6 +27,7 @@ dependencies {
     implementation(project(":foundation:bluetooth"))
     implementation(project(":provider:collection"))
     implementation(project(":provider:device"))
+    implementation(project(":provider:record"))
     implementation(project(":provider:user"))
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.appcompat)

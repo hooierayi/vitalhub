@@ -4,7 +4,7 @@
 
 - 定义：记录仪内部一次写卡操作的启动记录，由 `DeviceInfo.record` 中的 `DeviceRecordInfo` 表示。
 - 作用范围：连续记录采集模式。
-- `DeviceRecordInfo.id` 由 App 生成，用于本地跟踪该次操作；`startedAtEpochMillis` 保存启动成功时间。当前协议不保存结束时间，设备协议回执也不提供设备侧文件编号。
+- `DeviceRecordInfo.id` 由 App 生成，用于本地跟踪该次操作；新编号使用 `CONT-` 前缀，后接 UUID 去连字符后的前 12 位十六进制字符，历史 `REC-` 编号保持不变。`startedAtEpochMillis` 保存启动成功时间。当前协议不保存结束时间，设备协议回执也不提供设备侧文件编号。
 - 常见代码关键词：`DeviceInfo.record`、`DeviceRecordInfo`、`CollectionMode.CONTINUOUS`。
 
 ## 2. 相关位置

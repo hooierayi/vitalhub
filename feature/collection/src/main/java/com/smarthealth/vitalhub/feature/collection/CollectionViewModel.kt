@@ -33,7 +33,7 @@ data class CollectionUiState(
     val isContinuousRecording: Boolean = false,
     val isContinuousStartLoading: Boolean = false,
     val recordingElapsed: String = "00:00:00",
-    val recordId: String = "REC20240521001",
+    val recordId: String = "REC-000000000000",
     val startedAt: String = "2024-05-21  09:41:32",
     val flowError: String? = null,
     val deviceDebugInfo: String? = null,
@@ -42,7 +42,7 @@ data class CollectionUiState(
 class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
     private val mode = savedStateHandle.get<String>(RouteArgs.COLLECTION_MODE) ?: CollectionMode.PREVIEW
     private val recordId = savedStateHandle.get<String>(RECORD_ID_KEY)
-        ?: "REC-${UUID.randomUUID().toString().replace("-", "").take(12)}"
+        ?: "${recordIdPrefix(mode)}${UUID.randomUUID().toString().replace("-", "").take(12)}"
             .also { savedStateHandle[RECORD_ID_KEY] = it }
     private val isContinuousRecording = mode == CollectionMode.CONTINUOUS &&
         savedStateHandle.get<Boolean>(CONTINUOUS_IS_RECORDING_KEY) == true
@@ -299,6 +299,12 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         const val RECORD_STARTED_AT_KEY = "recordStartedAt"
         const val RECORD_FILE_PATH_KEY = "recordFilePath"
     }
+}
+
+internal fun recordIdPrefix(mode: String): String = when (mode) {
+    CollectionMode.CLIP -> "CLIP-"
+    CollectionMode.CONTINUOUS -> "CONT-"
+    else -> "REC-"
 }
 
 private fun formatRecordTime(epochMillis: Long): String = SimpleDateFormat(

@@ -143,7 +143,7 @@ private fun UploadStatusCard(state: AnalysisUiState) {
                     color = VitalColors.TextPrimary,
                 )
                 Text(
-                    text = "采集编号：${state.sessionId.ifBlank { "-" }}",
+                    text = "片段采集：${state.recordId.ifBlank { "-" }}",
                     fontSize = 13.sp,
                     color = VitalColors.TextSecondary,
                     maxLines = 1,

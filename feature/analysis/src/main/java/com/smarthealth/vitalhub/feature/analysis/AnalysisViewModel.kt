@@ -8,6 +8,7 @@ import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
+import com.smarthealth.vitalhub.provider.record.RecordProvider
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -39,6 +40,7 @@ enum class AnalysisProcessStage {
 data class AnalysisUiState(
     val sessionId: String,
     val flowEntryMode: String,
+    val recordId: String = "",
     val processStage: AnalysisProcessStage = AnalysisProcessStage.UPLOADING,
     val uploadProgress: Int = 0,
     val processError: String? = null,
@@ -57,6 +59,7 @@ data class AnalysisUiState(
 class AnalysisViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     private val collectionFlowProvider = resolveProvider<CollectionFlowProvider>()
     private val deviceProvider = resolveProvider<DeviceProvider>()
+    private val recordProvider = resolveProvider<RecordProvider>()
     private val userInfoProvider = resolveProvider<UserInfoProvider>()
     private val sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty()
     private val flowEntryMode = savedStateHandle.get<String>(RouteArgs.FLOW_ENTRY_MODE)
@@ -83,11 +86,23 @@ class AnalysisViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
 
     init {
+        loadRecordId()
         startMockProcess()
     }
 
     fun retryMockProcess() {
         if (_uiState.value.processStage == AnalysisProcessStage.FAILED) startMockProcess()
+    }
+
+    private fun loadRecordId() {
+        viewModelScope.launch {
+            val recordId = runCatching {
+                recordProvider?.getAllRecords()
+                    ?.firstOrNull { record -> record.sessionId == sessionId }
+                    ?.id
+            }.getOrNull().orEmpty()
+            _uiState.value = _uiState.value.copy(recordId = recordId)
+        }
     }
 
     private fun startMockProcess() {
