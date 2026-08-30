@@ -12,8 +12,10 @@ android {
         applicationId = "com.smarthealth.vitalhub"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = providers.gradleProperty("versionCode").orNull?.toIntOrNull() ?: 1
+        versionName = providers.gradleProperty("versionName").orNull ?: "1.0"
+        manifestPlaceholders["appName"] = providers.gradleProperty("appName").orNull
+            ?: "VitalHub"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

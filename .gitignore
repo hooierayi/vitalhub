@@ -16,6 +16,7 @@ render.experimental.xml
 *.aar
 *.ap_
 *.aab
+artifacts/
 
 # Files for the ART/Dalvik VM
 *.dex
