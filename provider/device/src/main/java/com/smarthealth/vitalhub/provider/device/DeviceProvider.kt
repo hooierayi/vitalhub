@@ -8,5 +8,8 @@ interface DeviceProvider : IProvider {
 
     fun getCurrentDevice(): BluetoothKitDevice?
 
+    /** Returns the persisted name of the most recently connected device when available. */
+    fun getCurrentDeviceName(): String?
+
     fun saveDevice(device: BluetoothKitDevice): Boolean
 }

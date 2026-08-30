@@ -43,6 +43,10 @@ class DeviceProviderImpl() : DeviceProvider {
         return requireDeviceFactory().invoke(mac)
     }
 
+    override fun getCurrentDeviceName(): String? = requireStorage()
+        .getString(KEY_DEVICE_NAME)
+        ?.takeIf(String::isNotBlank)
+
     @SuppressLint("MissingPermission")
     override fun saveDevice(device: BluetoothKitDevice): Boolean {
         require(device.key.isNotBlank()) { "Device id must not be blank." }

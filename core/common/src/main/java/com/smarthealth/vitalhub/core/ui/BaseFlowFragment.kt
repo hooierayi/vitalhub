@@ -186,6 +186,7 @@ fun FlowButton(
     style: FlowButtonStyle = FlowButtonStyle.PRIMARY,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     val color = when (style) {
         FlowButtonStyle.PRIMARY, FlowButtonStyle.OUTLINE -> VitalColors.Teal
@@ -195,14 +196,16 @@ fun FlowButton(
     if (style == FlowButtonStyle.OUTLINE) {
         OutlinedButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier.height(51.dp),
             shape = RoundedCornerShape(7.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, color),
+            border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = if (enabled) 1f else 0.38f)),
             contentPadding = PaddingValues(horizontal = 14.dp),
-        ) { Text(label, color = color, fontSize = 16.sp, fontWeight = FontWeight.Medium) }
+        ) { Text(label, color = color.copy(alpha = if (enabled) 1f else 0.38f), fontSize = 16.sp, fontWeight = FontWeight.Medium) }
     } else {
         Button(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier.height(51.dp),
             shape = RoundedCornerShape(7.dp),
             colors = ButtonDefaults.buttonColors(containerColor = color),

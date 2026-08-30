@@ -67,6 +67,20 @@ class CollectionFlowProviderImplTest {
     }
 
     @Test
+    fun `collection completion stores the first real completion time`() {
+        var now = 1_234L
+        val provider = CollectionFlowProviderImpl(FakeStorage()) { now }
+        val sessionId = provider.startNewSession().sessionId
+        provider.dispatch(sessionId, CollectionFlowEvent.PreQuestionnaireSubmitted)
+
+        provider.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
+        now = 9_999L
+        provider.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
+
+        assertEquals(1_234L, provider.getCurrentSession()?.collectionCompletedAtEpochMillis)
+    }
+
+    @Test
     fun `out of order post questionnaire marks card complete without advancing checkpoint`() {
         val provider = CollectionFlowProviderImpl(FakeStorage())
         val sessionId = provider.startNewSession().sessionId

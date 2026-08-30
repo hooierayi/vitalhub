@@ -21,10 +21,15 @@ import java.util.UUID
 class CollectionFlowProviderImpl() : CollectionFlowProvider {
     @Volatile
     private var storage: KVStorage? = null
+    private var clock: () -> Long = System::currentTimeMillis
     private val lock = Any()
 
-    internal constructor(storage: KVStorage) : this() {
+    internal constructor(
+        storage: KVStorage,
+        clock: () -> Long = System::currentTimeMillis,
+    ) : this() {
         this.storage = storage
+        this.clock = clock
     }
 
     override fun init(context: Context) {
@@ -47,7 +52,13 @@ class CollectionFlowProviderImpl() : CollectionFlowProvider {
     override fun dispatch(sessionId: String, event: CollectionFlowEvent): CollectionFlowTransition = synchronized(lock) {
         val current = readCurrent()
         if (current == null || current.sessionId != sessionId) return@synchronized CollectionFlowTransition.Rejected(current)
-        val recorded = current.copy(completedStepKeys = current.completedStepKeys + event.completedStep)
+        val recorded = current.copy(
+            completedStepKeys = current.completedStepKeys + event.completedStep,
+            collectionCompletedAtEpochMillis = when {
+                event == CollectionFlowEvent.CollectionCompleted && current.collectionCompletedAtEpochMillis == null -> clock()
+                else -> current.collectionCompletedAtEpochMillis
+            },
+        )
         if (recorded != current) write(recorded)
         reduce(recorded, event)
     }
@@ -106,7 +117,15 @@ class CollectionFlowProviderImpl() : CollectionFlowProvider {
             ?: return null
         val completedStepKeys = currentStorage.getInt(KEY_COMPLETED_STEP_MASK, checkpoint.completedStepMask)
             .toCompletedStepKeys()
-        return CollectionFlowSnapshot(sessionId, checkpoint, completedStepKeys)
+        val collectionCompletedAtEpochMillis = currentStorage
+            .getLong(KEY_COLLECTION_COMPLETED_AT_EPOCH_MILLIS, 0L)
+            .takeIf { it > 0L }
+        return CollectionFlowSnapshot(
+            sessionId = sessionId,
+            checkpoint = checkpoint,
+            completedStepKeys = completedStepKeys,
+            collectionCompletedAtEpochMillis = collectionCompletedAtEpochMillis,
+        )
     }
 
     private fun migrateLegacyIfNeeded(currentStorage: KVStorage) {
@@ -135,13 +154,18 @@ class CollectionFlowProviderImpl() : CollectionFlowProvider {
         else -> null
     }
 
-    private fun write(snapshot: CollectionFlowSnapshot): Boolean = requireStorage().edit()
-        .putString(KEY_SESSION_ID, snapshot.sessionId)
-        .putString(KEY_CHECKPOINT, snapshot.checkpoint.name)
-        .putInt(KEY_COMPLETED_STEP_MASK, snapshot.completedStepKeys.fold(0) { mask, step -> mask or step.bit })
-        .putInt(KEY_SCHEMA_VERSION, SCHEMA_VERSION)
-        .remove(LEGACY_KEY_STAGE)
-        .commit()
+    private fun write(snapshot: CollectionFlowSnapshot): Boolean {
+        val editor = requireStorage().edit()
+            .putString(KEY_SESSION_ID, snapshot.sessionId)
+            .putString(KEY_CHECKPOINT, snapshot.checkpoint.name)
+            .putInt(KEY_COMPLETED_STEP_MASK, snapshot.completedStepKeys.fold(0) { mask, step -> mask or step.bit })
+            .putInt(KEY_SCHEMA_VERSION, SCHEMA_VERSION)
+            .remove(LEGACY_KEY_STAGE)
+        snapshot.collectionCompletedAtEpochMillis?.let { completedAt ->
+            editor.putLong(KEY_COLLECTION_COMPLETED_AT_EPOCH_MILLIS, completedAt)
+        } ?: editor.remove(KEY_COLLECTION_COMPLETED_AT_EPOCH_MILLIS)
+        return editor.commit()
+    }
 
     private val CollectionFlowEvent.completedStep: CollectionFlowStep
         get() = when (this) {
@@ -166,7 +190,8 @@ class CollectionFlowProviderImpl() : CollectionFlowProvider {
         const val KEY_SESSION_ID = "session-id"
         const val KEY_CHECKPOINT = "checkpoint"
         const val KEY_COMPLETED_STEP_MASK = "completed-step-mask"
+        const val KEY_COLLECTION_COMPLETED_AT_EPOCH_MILLIS = "collection-completed-at-epoch-millis"
         const val LEGACY_KEY_STAGE = "stage"
-        const val SCHEMA_VERSION = 4
+        const val SCHEMA_VERSION = 5
     }
 }

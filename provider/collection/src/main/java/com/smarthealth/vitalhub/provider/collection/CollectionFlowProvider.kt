@@ -17,6 +17,7 @@ data class CollectionFlowSnapshot(
     val sessionId: String,
     val checkpoint: CollectionCheckpoint,
     val completedStepKeys: Set<CollectionFlowStep> = checkpoint.inferredCompletedSteps,
+    val collectionCompletedAtEpochMillis: Long? = null,
 ) {
     val completedSteps: Int get() = completedStepKeys.size
     val nextDestination: FlowDestination? get() = checkpoint.nextDestination
