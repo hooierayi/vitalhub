@@ -14,7 +14,7 @@ usage() {
         "  --type          Build type: debug or release." \
         "" \
         "Optional:" \
-        "  --output        Output directory. Defaults to <project>/artifacts/apk." \
+        "  --output        Output root. Defaults to <project>/artifacts/apk." \
         "  -h, --help      Show this help." \
         "" \
         "Example:" \
@@ -140,13 +140,18 @@ if [[ "$build_type" == "release" && ! -f "$source_apk" ]]; then
 fi
 [[ -f "$source_apk" ]] || fail "Gradle succeeded but no APK was found for $build_type."
 
-mkdir -p "$output_dir"
+version_output_dir="$output_dir/$build_type/$safe_version_name"
+mkdir -p "$version_output_dir"
+
+# Each build type/version directory keeps only its latest generated artifact.
+for existing_artifact in "$version_output_dir"/*.apk "$version_output_dir"/*.txt; do
+    [[ -e "$existing_artifact" ]] || continue
+    rm -f -- "$existing_artifact"
+done
+
 artifact_name="${safe_app_name}-${safe_version_name}-${version_code}-${commit_label}-${build_timestamp}-${build_type}.apk"
-artifact_path="$output_dir/$artifact_name"
+artifact_path="$version_output_dir/$artifact_name"
 metadata_path="${artifact_path%.apk}.txt"
-[[ ! -e "$artifact_path" && ! -e "$metadata_path" ]] || {
-    fail "Output already exists: $artifact_path"
-}
 cp "$source_apk" "$artifact_path"
 
 if command -v shasum >/dev/null 2>&1; then

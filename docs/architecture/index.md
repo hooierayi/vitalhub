@@ -34,7 +34,7 @@
 
 - 使用 `scripts/build-apk.sh` 统一生成 APK；必填参数为应用名称 `--name`、版本名称 `--version`、递增版本号 `--version-code` 和构建类型 `--type debug|release`。
 - 脚本通过 Gradle 属性覆盖 `appName`、`versionName` 和 `versionCode`；直接执行常规 Gradle 任务时仍使用 app 模块中的默认值。
-- 默认产物目录为 `artifacts/apk`，APK 文件名依次包含应用名称、版本名称、versionCode、Git 短提交号、工作区状态、连续数字构建时间和 debug/release 类型，同时生成同名 `.txt` 文件记录完整提交信息、构建时间、文件大小和 SHA-256。
+- 默认产物按 `artifacts/apk/<debug|release>/<versionName>/` 分类；每个构建类型的每个版本目录只保留最新一份 APK 及其同名 `.txt` 构建信息。APK 文件名依次包含应用名称、版本名称、versionCode、Git 短提交号、工作区状态、连续数字构建时间和 debug/release 类型。
 - `release` 当前未配置正式签名；脚本会保留并明确标记 unsigned APK，正式分发前需接入 release signingConfig。
 
 ## 2. 模块依赖关系
