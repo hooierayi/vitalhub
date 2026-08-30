@@ -50,7 +50,7 @@ data class AnalysisUiState(
         AnalysisMetric("睡眠时长", "7.2", "小时", "较上次上升 0.6", true, listOf(5.8f, 6.3f, 6.5f, 7.2f)),
     ),
     val collectionCompletedAt: String,
-    val deviceName: String,
+    val deviceAddress: String,
     val collectorName: String,
 ) {
     val completed: Boolean get() = processStage == AnalysisProcessStage.COMPLETED
@@ -76,7 +76,7 @@ class AnalysisViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             sessionId = sessionId,
             flowEntryMode = flowEntryMode,
             collectionCompletedAt = collectionCompletedAt?.let(::formatCollectionTime) ?: "-",
-            deviceName = resolveDeviceName(deviceProvider),
+            deviceAddress = resolveDeviceAddress(deviceProvider),
             collectorName = runCatching { userInfoProvider?.getUser()?.name }
                 .getOrNull()
                 ?.takeIf(String::isNotBlank)
@@ -142,11 +142,8 @@ private inline fun <reified T> resolveProvider(): T? = runCatching {
     ARouter.getInstance().navigation(T::class.java)
 }.getOrNull()
 
-private fun resolveDeviceName(provider: DeviceProvider?): String = runCatching {
-    provider?.getDeviceInfo()?.let { device ->
-        device.name?.takeIf(String::isNotBlank)
-            ?: device.address.takeIf(String::isNotBlank)
-    }
+internal fun resolveDeviceAddress(provider: DeviceProvider?): String = runCatching {
+    provider?.getDeviceInfo()?.address?.takeIf(String::isNotBlank)
 }.getOrNull() ?: "-"
 
 private fun formatCollectionTime(epochMillis: Long): String =

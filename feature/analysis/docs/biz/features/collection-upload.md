@@ -5,7 +5,7 @@
 - 片段采集倒计时完成后，`:feature:collection` 通过 `Navigator.analysis(...)` 打开 `AnalysisActivity`，并传入本次采集的 `sessionId`。
 - `AnalysisFragment` 按“上传与分析状态、本次记录信息、关键指标趋势”的顺序展示页面内容。
 - 页面标题沿用“AI分析结果”。
-- 本次记录信息不使用演示值：采集日期读取当前 `sessionId` 在 `CollectionFlowProvider` 中保存的首次采集完成时间，采集设备读取 `DeviceProvider` 中最近成功连接的设备，采集人读取 `UserInfoProvider` 中的当前用户；真实数据缺失时显示“-”。
+- 本次记录信息不使用演示值：采集日期读取当前 `sessionId` 在 `CollectionFlowProvider` 中保存的首次采集完成时间，采集设备展示 `DeviceProvider` 中最近成功连接设备的 MAC 地址，采集人读取 `UserInfoProvider` 中的当前用户；真实数据缺失时显示“-”。
 
 ## Mock 上传与分析流程
 

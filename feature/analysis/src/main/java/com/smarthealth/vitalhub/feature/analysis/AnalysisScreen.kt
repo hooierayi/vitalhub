@@ -347,7 +347,7 @@ private fun RecordInformationCard(state: AnalysisUiState) {
     ) {
         RecordInformationRow(Icons.Default.CalendarMonth, "采集日期", state.collectionCompletedAt)
         RecordDivider()
-        RecordInformationRow(Icons.Default.Sensors, "采集设备", state.deviceName)
+        RecordInformationRow(Icons.Default.Sensors, "采集设备", state.deviceAddress)
         RecordDivider()
         RecordInformationRow(Icons.Outlined.Person, "采集人", state.collectorName)
     }

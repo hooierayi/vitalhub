@@ -1,8 +1,13 @@
 package com.smarthealth.vitalhub.feature.analysis
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
+import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKitDevice
+import com.smarthealth.vitalhub.provider.device.DeviceInfo
+import com.smarthealth.vitalhub.provider.device.DeviceProvider
+import com.smarthealth.vitalhub.provider.device.DeviceRecordInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -62,5 +67,31 @@ class AnalysisViewModelTest {
         )
 
         assertEquals(FlowEntryMode.DIRECT_RETURN_HOME, viewModel.uiState.value.flowEntryMode)
+    }
+
+    @Test
+    fun `collection device displays mac address even when device has a name`() {
+        val provider = FakeDeviceProvider(
+            DeviceInfo(address = "AA:BB:CC:DD:EE:FF", name = "VitalHub Recorder"),
+        )
+
+        assertEquals("AA:BB:CC:DD:EE:FF", resolveDeviceAddress(provider))
+    }
+
+    @Test
+    fun `collection device displays placeholder when mac address is blank`() {
+        val provider = FakeDeviceProvider(DeviceInfo(address = "", name = "VitalHub Recorder"))
+
+        assertEquals("-", resolveDeviceAddress(provider))
+    }
+
+    private class FakeDeviceProvider(private val deviceInfo: DeviceInfo?) : DeviceProvider {
+        override fun init(context: Context?) = Unit
+        override fun getDeviceInfo(): DeviceInfo? = deviceInfo
+        override fun getRecordInfo(): DeviceRecordInfo? = deviceInfo?.record
+        override fun saveDevice(deviceInfo: DeviceInfo): Boolean = false
+        override fun getCurrentDevice(): BluetoothKitDevice? = null
+        override fun getCurrentDeviceAddress(): String? = deviceInfo?.address
+        override fun getCurrentDeviceName(): String? = deviceInfo?.name
     }
 }
