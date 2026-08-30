@@ -11,10 +11,9 @@ app
      │                    └─► provider:collection
      ├─ feature:user（Activity + Fragment）────► provider:user
      ├─ feature:questionnaire（Activity + Fragment）► provider:collection
-     ├─ feature:collection（Activity + device/collection Fragments）► provider:collection
+     ├─ feature:collection（Activity + device/collection Fragments）► provider:collection / provider:record
      └─ feature:analysis（Activity + Fragment）
 core:navi ◄──────────── app、provider 与所有 feature
-feature:user ──────────► core:storage
 ```
 
 - `app`：应用首页壳、`MainActivity`、Compose 底部导航、首页 Fragment 返回栈和 ARouter 初始化。
@@ -33,10 +32,11 @@ feature:user ──────────► core:storage
 - `foundation:device-sdk`：以上能力的总壳和会话编排；业务不负责组装及转发字节流。
 - `provider:user`：用户资料模型和 ARouter Provider 契约。
 - `provider:collection`：首页采集流程检查点、事件与 ARouter Provider 契约。
+- `provider:record`：已完成采集记录模型，以及查询、保存的 ARouter Provider 契约。
 - `feature:home`：采集任务入口与任务列表。
-- `feature:user`：用户信息编辑页面，以及以 ARouter Provider 暴露的 MMKV `UserInfoProvider` 实现。
+- `feature:user`：用户信息编辑页面，以及以 ARouter Provider 暴露的 Room `UserInfoProvider` 实现；用户以姓名、性别、年龄的 SHA-256 指纹关联，修改资料时切换 active/inactive。
 - `feature:questionnaire`：采集前睡眠问卷、采集后热相关症状问卷。
-- `feature:collection`：采集流程 Activity，内部包含 BLE 扫描、连接、设备状态、实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程状态机的 MMKV Provider 实现；运行时权限在进入 Activity 前处理。
+- `feature:collection`：采集流程 Activity，内部包含 BLE 扫描、连接、设备状态、实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程状态机的 MMKV Provider 和完成记录的 Room Provider 实现；运行时权限在进入 Activity 前处理。
 - `feature:analysis`：异步 AI 分析任务及结果。
 - `debug:dokit-bluetooth`、`debug:dokit-protocol`、`debug:dokit-waveform`：仅通过
   `app` 的 `debugImplementation` 接入的 DoKit 自定义工具，分别以可拖动的 App 内悬浮卡片
@@ -53,7 +53,7 @@ feature:user ──────────► core:storage
 底部导航属于应用级 UI，由 `app` 模块统一持有，包含“采集、记录、报告、我的”
 四个顶级入口。顶级 Tab 切换不加入业务返回栈；进入问卷、设备连接、采集和分析
 等子流程时隐藏底栏，返回实现 `BottomNavigationDestination` 的顶级 Fragment 时自动恢复。
-记录、报告和我的目前由 app 内占位页面承载，业务成熟后可迁移到独立 feature 模块，
+记录页由 app 壳通过 `:provider:record` 查询本地完成记录；报告和我的目前由 app 内占位页面承载，业务成熟后可迁移到独立 feature 模块，
 底栏逻辑无需变化。
 
 ## 沉浸式标题栏
@@ -78,6 +78,7 @@ Fragment 宿主，Fragment 作为内部 ARouter 路由入口和生命周期容�
 
 - `sessionId`：一次用户采集任务，关联前后问卷、设备、片段、上传与诊断结果。
 - `recordId`：记录仪创建的连续记录文件标识。
+- 完成记录：片段采集倒计时结束或连续记录正常结束后，由 `feature:collection` 写入 Room；记录仅以 `userFingerprint` 和 `deviceAddress` 逻辑关联 Provider 数据，不创建设备表。`app` 的记录页通过 `RecordProvider` 观察全部记录并按记录时间倒序展示。
 - 当前设备协议没有请求 ID：控制指令通过有界优先级队列严格单飞，以响应码匹配回执；只有明确幂等的命令允许超时重试。
 
 首页采集流程固定为“采集前问卷、数据采集、采集后问卷”三步。前问卷、正常结束采集和

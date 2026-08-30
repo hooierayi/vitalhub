@@ -38,10 +38,13 @@ class DeviceProviderImpl() : DeviceProvider {
     }
 
     override fun getCurrentDevice(): BluetoothKitDevice? {
-        val currentStorage = requireStorage()
-        val mac = currentStorage.getString(KEY_DEVICE_MAC)?.takeIf(String::isNotBlank) ?: return null
+        val mac = getCurrentDeviceAddress() ?: return null
         return requireDeviceFactory().invoke(mac)
     }
+
+    override fun getCurrentDeviceAddress(): String? = requireStorage()
+        .getString(KEY_DEVICE_MAC)
+        ?.takeIf(String::isNotBlank)
 
     override fun getCurrentDeviceName(): String? = requireStorage()
         .getString(KEY_DEVICE_NAME)
@@ -50,9 +53,10 @@ class DeviceProviderImpl() : DeviceProvider {
     @SuppressLint("MissingPermission")
     override fun saveDevice(device: BluetoothKitDevice): Boolean {
         require(device.key.isNotBlank()) { "Device id must not be blank." }
+        val name = device.bluetoothDevice?.name
         return requireStorage().edit()
             .putString(KEY_DEVICE_MAC, device.key)
-            .putString(KEY_DEVICE_NAME, device.bluetoothDevice?.name)
+            .putString(KEY_DEVICE_NAME, name)
             .commit()
     }
 

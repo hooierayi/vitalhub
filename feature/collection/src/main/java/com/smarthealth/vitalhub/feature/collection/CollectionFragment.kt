@@ -20,6 +20,8 @@ import com.smarthealth.vitalhub.foundation.device.api.FrameContinuity
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
+import com.smarthealth.vitalhub.provider.device.DeviceProvider
+import com.smarthealth.vitalhub.provider.record.RecordProvider
 import com.smarthealth.vitalhub.provider.user.Gender
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import java.io.File
@@ -127,6 +129,7 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             val target = File(directory, "$sessionId-${System.currentTimeMillis()}.vhf")
             runCatching { collectionBluetoothProvider.startRecording(target.absolutePath) }
                 .onSuccess {
+                    viewModel.markLocalRecordingStarted(target.absolutePath)
                     Navigator.collection(
                         host,
                         sessionId,
@@ -211,7 +214,10 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
                 ?: File(requireContext().filesDir, "records")
             val target = File(directory, "$sessionId-${System.currentTimeMillis()}.vhf")
             runCatching { collectionBluetoothProvider.startRecording(target.absolutePath) }
-                .onSuccess { viewModel.restartClipTimer() }
+                .onSuccess {
+                    viewModel.markLocalRecordingStarted(target.absolutePath)
+                    viewModel.restartClipTimer()
+                }
                 .onFailure {
                     viewModel.reportDeviceError(it.message ?: "无法创建采集文件")
                 }
@@ -222,6 +228,10 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching { collectionBluetoothProvider.stopRecording() }
                 .onFailure { viewModel.reportDeviceError(it.message ?: "停止本地记录失败") }
+            if (!saveCompletedRecord()) {
+                viewModel.reportDeviceError("采集已结束，但记录保存失败，请重新采集")
+                return@launch
+            }
             runCatching {
                 ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
                     ?.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
@@ -238,7 +248,11 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         }
     }
 
-    private fun finishCollection(sessionId: String) {
+    private suspend fun finishCollection(sessionId: String) {
+        if (!saveCompletedRecord()) {
+            viewModel.reportDeviceError("采集已结束，但记录保存失败，请稍后重试")
+            return
+        }
         val transition = runCatching {
             ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
                 ?.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
@@ -258,5 +272,21 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             }
             else -> viewModel.reportFlowError()
         }
+    }
+
+    private suspend fun saveCompletedRecord(): Boolean {
+        val user = runCatching {
+            ARouter.getInstance().navigation(UserInfoProvider::class.java)?.getUser()
+        }.getOrNull()
+        val deviceAddress = runCatching {
+            ARouter.getInstance().navigation(DeviceProvider::class.java)?.getCurrentDeviceAddress()
+        }.getOrNull()
+        val record = viewModel.completedRecord(
+            userFingerprint = user?.fingerprint ?: return false,
+            deviceAddress = deviceAddress ?: return false,
+        ) ?: return false
+        return runCatching {
+            ARouter.getInstance().navigation(RecordProvider::class.java)?.saveRecord(record) == true
+        }.getOrDefault(false)
     }
 }

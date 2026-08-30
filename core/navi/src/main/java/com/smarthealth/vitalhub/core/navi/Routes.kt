@@ -9,6 +9,7 @@ object Routes {
     const val USER_INFO_PROVIDER = "/user/service"
     const val COLLECTION_FLOW_PROVIDER = "/collection/flow/service"
     const val DEVICE_PROVIDER = "/device/service"
+    const val RECORD_PROVIDER = "/record/service"
     const val QUESTIONNAIRE = "/questionnaire/form"
     const val QUESTIONNAIRE_FRAGMENT = "/questionnaire/form/content"
     const val COLLECTION_FLOW = "/collection/flow"

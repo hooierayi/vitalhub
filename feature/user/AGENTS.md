@@ -2,7 +2,7 @@
 
 ## 1. 模块定位
 
-- 模块职责：提供用户资料填写/修改页面，并实现 `UserInfoProvider` 的本地 MMKV 服务。
+- 模块职责：提供用户资料填写/修改页面，并实现 `UserInfoProvider` 的本地 Room 服务。
 - 所属业务域：采集前的用户资料登记。
 - 本模块负责：表单状态与校验、`/user/edit` Activity 外部路由、内部 Fragment 路由、`/user/service` ARouter Provider 实现。
 - 本模块不负责：首页摘要和问卷页面；它们只能通过 `:provider:user` 的接口读取资料。
@@ -12,7 +12,7 @@
 | 入口类型 | 入口 | 说明 | 相关文档 |
 |---|---|---|---|
 | 页面路由 | `/user/edit` | `UserActivity` 外部入口，承载资料编辑 Fragment | `docs/biz/features/user-profile.md` |
-| ARouter Provider | `/user/service` | `UserInfoProvider` 的 MMKV 实现 | `docs/biz/features/user-profile.md` |
+| ARouter Provider | `/user/service` | `UserInfoProvider` 的 Room 实现 | `docs/biz/features/user-profile.md` |
 
 ## 3. 关键文件
 
@@ -21,7 +21,7 @@
 | `UserActivity.kt` | ARouter Activity 外部入口和 Fragment 宿主 |
 | `UserInfoEditFragment.kt` | 内部 Fragment 路由和页面标题 |
 | `UserInfoEditViewModel.kt` | 创建/编辑态、字段校验与保存 |
-| `UserInfoProviderImpl.kt` | MMKV 读取、完整性判定和保存 |
+| `UserInfoProviderImpl.kt` | Room 读取、指纹关联和活跃状态切换 |
 
 ## 4. 必须遵守
 

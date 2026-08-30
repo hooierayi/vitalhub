@@ -86,11 +86,11 @@ graph TD
 
 | 模块 | 类型 | 直接依赖 | 被谁依赖 | 变更影响 |
 |---|---|---|---|---|
-| `:app` | Android application | common、navi、permission、foundation:bluetooth、5 个 feature | 无 | 应用启动、全局蓝牙初始化、首页壳层和发布产物 |
+| `:app` | Android application | common、navi、permission、foundation:bluetooth、provider:record、provider:user、5 个 feature | 无 | 应用启动、全局蓝牙初始化、首页壳层、采集记录及其用户关联查询和发布产物 |
 | `:core:common` | Android library | AndroidX、Compose | app、全部 feature | 公共 UI 与通用模型的全局影响 |
 | `:core:navi` | Android library | common、AppCompat、Fragment、ARouter API | app、provider、全部 feature | Activity/Fragment 路由契约、返回策略与导航宿主的全局影响 |
 | `:core:permission` | Android library | AndroidX Core、Fragment | app（配置注入） | 可注入权限定义、检查、申请、端内兜底弹窗和设置页跳转的全局影响 |
-| `:core:storage` | Android library | AndroidX Core、MMKV | feature:user（及后续需要本地 KV 的模块） | 通用本地键值存储与加密策略 |
+| `:core:storage` | Android library | AndroidX Core、MMKV | collection | 通用本地键值存储与加密策略 |
 | `:foundation:bluetooth` | Android library | AndroidX AppCompat | app、feature:collection | 经典蓝牙与 BLE 扫描、连接、读写及事件回调基础能力；由 app 在 Application 中完成全局配置 |
 | `:foundation:device-waveform-ui` | Android library | Compose | feature:collection（及后续回放/分析页面） | 物理图纸标定、实时波形缓冲和绘制策略 |
 | `:foundation:device-api` | Android library | Coroutines | device-*、collection | 设备会话、聚合帧、命令与消费流稳定契约 |
@@ -100,13 +100,14 @@ graph TD
 | `:foundation:device-storage` | Android library | device-api | device-sdk | 解析后聚合帧异步文件记录 |
 | `:foundation:device-waveform` | Android library | device-api | device-sdk | ECG/呼吸波形投影和慢消费者隔离 |
 | `:foundation:device-sdk` | Android library | bluetooth、全部 device 子模块 | collection | 设备能力总壳、会话生命周期和自动分发 |
-| `:provider:user` | Android library | ARouter API | home、feature:user | 用户资料数据契约的影响面 |
+| `:provider:user` | Android library | ARouter API | app、home、collection、analysis、feature:user | 用户资料、指纹及历史关联查询契约的影响面 |
 | `:provider:collection` | Android library | navi、ARouter API | home、questionnaire、collection | 采集流程状态机契约的影响面 |
-| `:provider:device` | Android library | ARouter API | collection | 最近成功连接设备的持久化查询与保存契约 |
+| `:provider:device` | Android library | ARouter API、bluetooth | collection、analysis | 最近成功连接设备、名称和 MAC 地址的查询与保存契约 |
+| `:provider:record` | Android library | ARouter API、Coroutines | app、collection | 已完成采集记录的查询、观察与保存契约 |
 | `:feature:home` | Android library | common、navi、provider:user、provider:collection | app | 采集入口与任务列表 |
-| `:feature:user` | Android library | common、navi、storage、provider:user | app | 用户资料 Activity、内部 Fragment 与本地资料实现 |
+| `:feature:user` | Android library | common、navi、provider:user、Room | app | 用户资料 Activity、内部 Fragment 与 Room 用户资料实现 |
 | `:feature:questionnaire` | Android library | common、navi、provider:collection | app | 前后问卷 Activity 与内部 Fragment |
-| `:feature:collection` | Android library | common、device-waveform-ui、navi、storage、foundation:bluetooth、device-api、device-sdk、provider:collection、provider:device | app | BLE 设备、采集 Activity、内部 Fragment、记录与流程状态机实现 |
+| `:feature:collection` | Android library | common、device-waveform-ui、navi、storage、foundation:bluetooth、device-api、device-sdk、provider:collection、provider:device、provider:record、Room | app | BLE 设备、采集 Activity、内部 Fragment、完成记录与流程状态机实现 |
 | `:feature:analysis` | Android library | common、navi | app | 分析 Activity 与内部 Fragment |
 | `:debug:dokit-bluetooth` | Android library（debug only） | device-api、DoKit | app debug | 蓝牙连接、完整原始 RX/TX 数据调试面板 |
 | `:debug:dokit-protocol` | Android library（debug only） | device-api、DoKit | app debug | 协议缓冲、拆包恢复、指令及回执调试面板 |
@@ -123,9 +124,10 @@ graph TD
 - `:foundation:bluetooth` 是蓝牙基础能力层，封装经典蓝牙与 BLE 的扫描、连接、读写和回调，不依赖业务 feature。
 - `:foundation:device-*` 按 API、传输、协议、指令、存储、波形和总壳拆分；协议层持有环形缓冲和通用拦截器外层，总壳把解析后的同一聚合帧自动分发给不同消费者。
 - `:app` 在 `VitalHubApplication` 中统一初始化 `BluetoothKit` 及扫描规则；业务 feature 只获取并使用已初始化的单例。
-- `:provider:user` 是继承 `IProvider` 的用户资料能力契约层；`:feature:user` 负责资料编辑、MMKV 本地实现及 `/user/service` ARouter 服务注册。
+- `:provider:user` 是继承 `IProvider` 的用户资料能力契约层；`:feature:user` 负责资料编辑、Room 用户表、指纹与 active/inactive 状态切换及 `/user/service` ARouter 服务注册。
 - `:provider:collection` 是继承 `IProvider` 的采集流程状态机契约层；`:feature:collection` 负责 MMKV 实现及 `/collection/flow/service` 服务注册。
-- `:provider:device` 是继承 `IProvider` 的最近连接设备契约层；`:feature:collection` 负责兼容既有存储的 MMKV 实现及 `/device/service` 服务注册。
+- `:provider:device` 是继承 `IProvider` 的最近连接设备契约层；`:feature:collection` 负责 MMKV 实现，并提供当前设备、名称和 MAC 地址及 `/device/service` 服务注册。
+- `:provider:record` 是继承 `IProvider` 的完成记录契约层；`:feature:collection` 负责 Room 实现及 `/record/service` 服务注册，`:app` 只通过契约查询。
 - feature 模块不直接依赖彼此，使用 ARouter 路径经 `Navigator` 跳转。
 - 三个 `:debug:dokit-*` 模块只消费 foundation 暴露的惰性调试快照，不被业务模块依赖；工具以宿主 Activity 内可拖动的数据卡片展示并保留完整详情页，不申请系统悬浮窗权限。DoKit SDK 只存在于 app debug 运行时，release 不打包悬浮卡片或面板 Activity。
 

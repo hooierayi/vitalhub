@@ -32,6 +32,18 @@ class UserInfoProviderContractTest {
 
         assertTrue(savedSuccessfully)
         assertEquals(saved, provider.getUser())
+        assertEquals(saved, provider.getUser(saved.fingerprint))
+    }
+
+    @Test
+    fun `fingerprint is stable for normalized profile and changes with profile`() {
+        val user = UserInfo(name = " 张三 ", gender = Gender.MALE, age = 32)
+
+        assertEquals(
+            UserInfo(name = "张三", gender = Gender.MALE, age = 32).fingerprint,
+            user.fingerprint,
+        )
+        assertTrue(user.fingerprint != user.copy(age = 33).fingerprint)
     }
 }
 
@@ -41,6 +53,9 @@ private class FakeUserInfoProvider(
     override fun init(context: Context) = Unit
 
     override fun getUser(): UserInfo? = currentUser
+
+    override fun getUser(fingerprint: String): UserInfo? = currentUser
+        ?.takeIf { it.fingerprint == fingerprint }
 
     override suspend fun saveUser(user: UserInfo): Boolean {
         currentUser = user

@@ -18,7 +18,10 @@ android {
 }
 
 kapt {
-    arguments { arg("AROUTER_MODULE_NAME", project.name) }
+    arguments {
+        arg("AROUTER_MODULE_NAME", project.name)
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
@@ -31,6 +34,7 @@ dependencies {
     implementation(project(":foundation:device-sdk"))
     implementation(project(":provider:collection"))
     implementation(project(":provider:device"))
+    implementation(project(":provider:record"))
     implementation(project(":provider:user"))
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.appcompat)
@@ -45,6 +49,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
     kapt(libs.arouter.compiler)
+    kapt(libs.androidx.room.compiler)
     testImplementation(libs.junit)
 }

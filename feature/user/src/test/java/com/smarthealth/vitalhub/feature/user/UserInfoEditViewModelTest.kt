@@ -96,6 +96,9 @@ private class FakeUserInfoProvider(
 
     override fun getUser(): UserInfo? = currentUser
 
+    override fun getUser(fingerprint: String): UserInfo? = currentUser
+        ?.takeIf { it.fingerprint == fingerprint }
+
     override suspend fun saveUser(user: UserInfo): Boolean {
         saved = true
         currentUser = user

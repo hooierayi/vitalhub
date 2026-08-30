@@ -20,13 +20,15 @@ android {
 }
 
 kapt {
-    arguments { arg("AROUTER_MODULE_NAME", project.name) }
+    arguments {
+        arg("AROUTER_MODULE_NAME", project.name)
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:navi"))
-    implementation(project(":core:storage"))
     implementation(project(":provider:user"))
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.appcompat)
@@ -41,7 +43,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
     kapt(libs.arouter.compiler)
+    kapt(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

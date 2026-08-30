@@ -33,10 +33,11 @@
 - 不将 `Activity`、`View`、大对象、不可序列化状态或临时 Lambda 作为路由参数跨模块传递；需要回调时，将回调接口定义在 provider 契约中。
 - 当前 `UserInfoProvider` 以 `/user/service` 注册，调用方通过 `ARouter.navigation(UserInfoProvider::class.java)` 获取；不维护手写注册表或由 `Application` 手动安装实现。
 - 当前 `CollectionFlowProvider` 以 `/collection/flow/service` 注册，由首页和流程模块通过 `ARouter.navigation(CollectionFlowProvider::class.java)` 获取；Provider 只保存三项业务流程检查点，不保存设备连接和采集中的硬件瞬态。
+- 当前 `RecordProvider` 以 `/record/service` 注册，由采集模块保存完成记录、app 记录页观察全部记录；Room 实现不暴露到契约或 app。
 
 ## 3. UI 壳约束
 
-- 顶级底栏目前包含采集、记录、报告、我的；后 3 项目前由 app 内占位页面承载。
+- 顶级底栏目前包含采集、记录、报告、我的；记录页通过 `RecordProvider` 展示本地完成记录，报告和我的仍由 app 内占位页面承载。
 - 顶级 Tab 不进入业务返回栈；子流程默认入栈并隐藏底栏。
 - 标题栏返回与系统返回共用 Activity 返回栈策略：片段采集、连续记录在 `CollectionFlowActivity` 内回到实时预览；倒计时完成进入上传与分析页时，等待 `AnalysisActivity` 到达后销毁 `CollectionFlowActivity`；上传与分析页的标题栏返回、系统返回及“回首页”操作直接恢复首页，“填写采集后问卷”在后问卷到达后移除 `AnalysisActivity`；问卷返回通过结束 `QuestionnaireActivity` 直接恢复其下的页面，其他子流程按所属 Activity 的 Fragment 返回栈逐级回退。
 - 所有新业务页面维持 Activity + Fragment + ComposeView 模式，首页仍由 MainActivity 承载 Fragment，Compose 内容在 feature 模块内实现。

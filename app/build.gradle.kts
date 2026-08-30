@@ -47,6 +47,8 @@ dependencies {
     implementation(project(":core:navi"))
     implementation(project(":core:permission"))
     implementation(project(":foundation:bluetooth"))
+    implementation(project(":provider:record"))
+    implementation(project(":provider:user"))
     implementation(project(":feature:home"))
     implementation(project(":feature:user"))
     implementation(project(":feature:questionnaire"))

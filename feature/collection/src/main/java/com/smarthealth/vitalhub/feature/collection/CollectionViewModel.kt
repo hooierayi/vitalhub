@@ -5,6 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smarthealth.vitalhub.core.navi.CollectionMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
+import com.smarthealth.vitalhub.provider.record.CollectionRecord
+import com.smarthealth.vitalhub.provider.record.RecordType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,9 +37,21 @@ data class CollectionUiState(
 )
 
 class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
+    private val mode = savedStateHandle.get<String>(RouteArgs.COLLECTION_MODE) ?: CollectionMode.PREVIEW
+    private val recordId = savedStateHandle.get<String>(RECORD_ID_KEY)
+        ?: "REC-${UUID.randomUUID().toString().replace("-", "").take(12)}"
+            .also { savedStateHandle[RECORD_ID_KEY] = it }
+    private val continuousStartedAt = if (mode == CollectionMode.CONTINUOUS) {
+        savedStateHandle.get<Long>(RECORD_STARTED_AT_KEY)
+            ?: System.currentTimeMillis().also { savedStateHandle[RECORD_STARTED_AT_KEY] = it }
+    } else {
+        0L
+    }
     private val _uiState = MutableStateFlow(CollectionUiState(
         sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty(),
-        mode = savedStateHandle.get<String>(RouteArgs.COLLECTION_MODE) ?: CollectionMode.PREVIEW,
+        mode = mode,
+        recordId = recordId,
+        startedAt = continuousStartedAt.takeIf { it > 0L }?.let(::formatRecordTime).orEmpty(),
     ))
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
     private var clipTimerJob: Job? = null
@@ -75,6 +93,37 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         savedStateHandle[CLIP_COMPLETION_PENDING_KEY] = false
         updateClipTimer(0L, isCollecting = true)
         startClipTimer(startedAt)
+    }
+
+    fun markLocalRecordingStarted(path: String) {
+        val startedAt = System.currentTimeMillis()
+        savedStateHandle[RECORD_FILE_PATH_KEY] = path
+        savedStateHandle[RECORD_STARTED_AT_KEY] = startedAt
+        _uiState.value = _uiState.value.copy(startedAt = formatRecordTime(startedAt))
+    }
+
+    fun completedRecord(
+        userFingerprint: String,
+        deviceAddress: String,
+        recordedAtEpochMillis: Long = System.currentTimeMillis(),
+    ): CollectionRecord? {
+        val state = _uiState.value
+        val type = when (state.mode) {
+            CollectionMode.CLIP -> RecordType.CLIP
+            CollectionMode.CONTINUOUS -> RecordType.CONTINUOUS
+            else -> return null
+        }
+        val startedAt = savedStateHandle.get<Long>(RECORD_STARTED_AT_KEY) ?: return null
+        return CollectionRecord(
+            id = recordId,
+            sessionId = state.sessionId,
+            type = type,
+            recordedAtEpochMillis = recordedAtEpochMillis,
+            durationMillis = (recordedAtEpochMillis - startedAt).coerceAtLeast(0L),
+            localFilePath = savedStateHandle.get(RECORD_FILE_PATH_KEY),
+            userFingerprint = userFingerprint,
+            deviceAddress = deviceAddress,
+        )
     }
 
     fun consumeClipCountdownFinished() {
@@ -146,5 +195,13 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         const val CLIP_IS_COLLECTING_KEY = "clipIsCollecting"
         const val CLIP_COMPLETION_PENDING_KEY = "clipCompletionPending"
         const val PROGRESS_UPDATE_INTERVAL_MILLIS = 100L
+        const val RECORD_ID_KEY = "recordId"
+        const val RECORD_STARTED_AT_KEY = "recordStartedAt"
+        const val RECORD_FILE_PATH_KEY = "recordFilePath"
     }
 }
+
+private fun formatRecordTime(epochMillis: Long): String = SimpleDateFormat(
+    "yyyy-MM-dd  HH:mm:ss",
+    Locale.getDefault(),
+).format(Date(epochMillis))

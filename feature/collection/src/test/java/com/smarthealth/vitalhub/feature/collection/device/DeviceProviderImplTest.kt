@@ -25,6 +25,7 @@ class DeviceProviderImplTest {
         )
 
         assertTrue(provider.saveDevice(device))
+        assertEquals("AA:BB", provider.getCurrentDeviceAddress())
 
         val restoredDevice = provider.getCurrentDevice() as BluetoothGattDevice
         assertEquals(device.key, restoredDevice.key)

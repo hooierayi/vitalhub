@@ -10,9 +10,12 @@ import com.alibaba.android.arouter.facade.template.IProvider
 interface UserInfoProvider : IProvider {
     /**
      * Returns the complete locally stored profile, or null when no valid profile exists.
-     * This is a lightweight MMKV lookup and is safe for route-time title decisions.
+     * This is a lightweight local lookup and is safe for route-time title decisions.
      */
     fun getUser(): UserInfo?
+
+    /** Returns a historical user by its profile-derived fingerprint. */
+    fun getUser(fingerprint: String): UserInfo?
 
     /**
      * Persists [user] and reports whether the storage implementation accepted the complete update.
