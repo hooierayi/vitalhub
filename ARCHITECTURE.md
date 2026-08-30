@@ -19,10 +19,18 @@ feature:user ──────────► core:storage
 
 - `app`：应用首页壳、`MainActivity`、Compose 底部导航、首页 Fragment 返回栈和 ARouter 初始化。
 - `core:common`：跨模块通用模型、Compose 主题与公共组件；不依赖任何业务模块。
+- `core:waveform-ui`：不依赖设备协议的实时波形 UI，按物理图纸标定绘制网格、ECG 和呼吸，提供固定容量采样环形缓冲、扫屏与滚动模式。
 - `core:navi`：ARouter 路径与参数、`Navigator`、Fragment 导航宿主契约、流程返回策略与导航去重；不依赖业务 feature。
 - `core:permission`：可注入的运行时权限定义、统一检查/申请、端内拒绝兜底弹窗及应用设置页跳转；不依赖业务 feature。应用层注入权限、路由守卫、前台 Activity 来源和弹窗实现，具体权限声明由使用它的 feature Manifest 提供。
 - `core:storage`：可复用的本地键值存储，提供 SharedPreferences/MMKV 后端、批量编辑和可选 Android Keystore 加密。
 - `foundation:bluetooth`：可复用的经典蓝牙与 BLE 基础组件，提供扫描、连接、读写及事件回调能力。
+- `foundation:device-api`：业务可见的 `DeviceSdk`、`DeviceSession`、聚合数据帧、指令与状态契约。
+- `foundation:device-transport`：把底层蓝牙回调适配为有序字节流和挂起式写入，不识别协议。
+- `foundation:device-protocol`：自动扩容环形缓冲、可配置拦截器管线、拆包、校验、序号连续性和聚合帧解析。
+- `foundation:device-command`：有界优先级指令队列、单飞 Worker、编码、回执匹配、超时及幂等重试。
+- `foundation:device-storage`：解析后聚合帧的异步无静默丢帧存储和 `.part` 文件收口。
+- `foundation:device-waveform`：从聚合帧分别投影 `EcgWaveformFrame` / `RespirationWaveformFrame`，并隔离慢 UI 消费者。
+- `foundation:device-sdk`：以上能力的总壳和会话编排；业务不负责组装及转发字节流。
 - `provider:user`：用户资料模型和 ARouter Provider 契约。
 - `provider:collection`：首页采集流程检查点、事件与 ARouter Provider 契约。
 - `feature:home`：采集任务入口与任务列表。
@@ -66,7 +74,7 @@ Fragment 宿主，Fragment 作为内部 ARouter 路由入口和生命周期容�
 
 - `sessionId`：一次用户采集任务，关联前后问卷、设备、片段、上传与诊断结果。
 - `recordId`：记录仪创建的连续记录文件标识。
-- `cmdSeq`：设备控制命令序号，用于 ACK/NACK、超时重试和幂等处理。
+- 当前设备协议没有请求 ID：控制指令通过有界优先级队列严格单飞，以响应码匹配回执；只有明确幂等的命令允许超时重试。
 
 首页采集流程固定为“采集前问卷、连接设备、开始采集、采集后问卷”四步。前问卷、
 设备连接、正常结束采集和后问卷提交依次使进度达到 1/4 至 4/4。Provider 以事件 reducer
@@ -75,14 +83,13 @@ Fragment 宿主，Fragment 作为内部 ARouter 路由入口和生命周期容�
 采集阶段的主页面；片段采集或连续记录使用系统返回或标题栏返回时都回到实时预览。采集后
 问卷使用系统返回或标题栏返回时回到首页。AI 分析不属于首页流程，后问卷提交后直接返回首页。
 
-## 推荐的数据层边界
+## 数据层边界
 
 后续实现时，在对应 feature 内采用 `ui / domain / data` 三层：
 
-- `collection` 内的 device 领域负责连接状态和原始数据流，不向 UI 暴露 BLE GATT 细节；
-- `collection` 的采集领域负责分片重组、CRC、文件缓存、断点上传和采集状态机；
+- `collection` 只依赖 `DeviceSession` 连接状态、命令和类型化数据流，不向 UI 暴露 BLE GATT 或协议细节；
+- 字节流重组、校验、聚合帧解析、波形投影和本地记录由 `foundation:device-*` 模块实现；详细边界见 `docs/architecture/device-sdk.md`；
 - `questionnaire` 以配置模型渲染题目，答案仅通过 `sessionId` 关联；
 - `analysis` 只消费 `analysisTaskId` 的异步状态。
 
-协议解析若会被多个业务模块消费，再下沉为独立的 `core:protocol`，不要提前把
-尚未定稿的设备协议固化到公共模块。
+设备相关实现按职责位于 `foundation:device-*`；尚未确认的 UUID、标量字节序和校验范围必须由设备配置注入，不得作为既有事实固化。

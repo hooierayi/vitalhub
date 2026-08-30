@@ -19,6 +19,7 @@ data class CollectionUiState(
     val recordId: String = "REC20240521001",
     val startedAt: String = "2024-05-21  09:41:32",
     val flowError: String? = null,
+    val deviceDebugInfo: String? = null,
 )
 
 class CollectionViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
@@ -30,5 +31,9 @@ class CollectionViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
 
     fun reportFlowError() {
         _uiState.value = _uiState.value.copy(flowError = "采集流程暂不可用，请稍后重试")
+    }
+
+    fun reportDeviceError(message: String) {
+        _uiState.value = _uiState.value.copy(flowError = message)
     }
 }

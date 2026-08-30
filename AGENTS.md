@@ -112,10 +112,18 @@
 |---|---|---|---|
 | `:app` | Application、首页 Activity、应用壳与顶级导航 | 组装层 | 根 `AGENTS.md` |
 | `:core:common` | 跨模块通用模型与公共 UI | 基础层 | 根 `AGENTS.md` |
+| `:core:waveform-ui` | 物理心电图纸、实时波形环形缓冲、扫屏/滚动与 ECG/呼吸 Compose 组件 | 基础层 | 根 `AGENTS.md` |
 | `:core:navi` | 路由契约、导航宿主接口、返回策略与导航去重 | 基础层 | 根 `AGENTS.md` |
 | `:core:permission` | 可注入的运行时权限契约、检查、申请、端内兜底弹窗与设置页跳转 | 基础层 | 根 `AGENTS.md` |
 | `:core:storage` | 通用键值存储抽象及 SharedPreferences/MMKV 实现 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:bluetooth` | 经典蓝牙与 BLE 的扫描、连接、读写及事件回调基础能力 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-api` | 设备 SDK、会话、聚合帧、命令和状态稳定契约 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-transport` | 蓝牙回调到有序字节流/挂起写入的适配 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-protocol` | 环形缓冲、拦截器拆包、校验、连续性和聚合帧解析 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-command` | 有界优先级队列、单飞指令、回执和超时重试 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-storage` | 解析后聚合帧的异步文件记录 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-waveform` | ECG/呼吸波形投影和慢消费者隔离 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-sdk` | 设备能力总壳、会话编排和自动分发 | 基础层 | 根 `AGENTS.md` |
 | `:provider:user` | 用户资料的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:collection` | 采集流程进度的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:device` | 最近成功连接设备的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |

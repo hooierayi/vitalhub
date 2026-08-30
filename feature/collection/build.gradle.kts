@@ -23,11 +23,15 @@ kapt {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:waveform-ui"))
     implementation(project(":core:navi"))
     implementation(project(":core:storage"))
     implementation(project(":foundation:bluetooth"))
+    implementation(project(":foundation:device-api"))
+    implementation(project(":foundation:device-sdk"))
     implementation(project(":provider:collection"))
     implementation(project(":provider:device"))
+    implementation(project(":provider:user"))
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.appcompat)
     implementation(libs.arouter.api)

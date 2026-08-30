@@ -37,9 +37,18 @@
 ```mermaid
 graph TD
     app[":app"] --> common[":core:common"]
+    collection --> waveformUi[":core:waveform-ui"]
     app --> navi[":core:navi"]
     app --> permission[":core:permission"]
     app --> bluetooth[":foundation:bluetooth"]
+    deviceTransport[":foundation:device-transport"] --> bluetooth
+    deviceSdk[":foundation:device-sdk"] --> deviceApi[":foundation:device-api"]
+    deviceSdk --> deviceTransport
+    deviceSdk --> deviceProtocol[":foundation:device-protocol"]
+    deviceSdk --> deviceCommand[":foundation:device-command"]
+    deviceSdk --> deviceStorage[":foundation:device-storage"]
+    deviceSdk --> deviceWaveform[":foundation:device-waveform"]
+    deviceCommand --> deviceTransport
     userFeature --> storage[":core:storage"]
     app --> home[":feature:home"]
     app --> userFeature[":feature:user"]
@@ -56,6 +65,8 @@ graph TD
     collection --> common
     collection --> navi
     collection --> bluetooth
+    collection --> deviceApi
+    collection --> deviceSdk
     collection --> collectionProvider
     questionnaire --> collectionProvider
     analysis --> common
@@ -71,27 +82,37 @@ graph TD
 |---|---|---|---|---|
 | `:app` | Android application | common、navi、permission、foundation:bluetooth、5 个 feature | 无 | 应用启动、全局蓝牙初始化、首页壳层和发布产物 |
 | `:core:common` | Android library | AndroidX、Compose | app、全部 feature | 公共 UI 与通用模型的全局影响 |
+| `:core:waveform-ui` | Android library | Compose | feature:collection（及后续回放/分析页面） | 物理图纸标定、实时波形缓冲和绘制策略 |
 | `:core:navi` | Android library | common、AppCompat、Fragment、ARouter API | app、provider、全部 feature | Activity/Fragment 路由契约、返回策略与导航宿主的全局影响 |
 | `:core:permission` | Android library | AndroidX Core、Fragment | app（配置注入） | 可注入权限定义、检查、申请、端内兜底弹窗和设置页跳转的全局影响 |
 | `:core:storage` | Android library | AndroidX Core、MMKV | feature:user（及后续需要本地 KV 的模块） | 通用本地键值存储与加密策略 |
 | `:foundation:bluetooth` | Android library | AndroidX AppCompat | app、feature:collection | 经典蓝牙与 BLE 扫描、连接、读写及事件回调基础能力；由 app 在 Application 中完成全局配置 |
+| `:foundation:device-api` | Android library | Coroutines | device-*、collection | 设备会话、聚合帧、命令与消费流稳定契约 |
+| `:foundation:device-transport` | Android library | device-api、bluetooth | device-command、device-sdk | 把蓝牙回调适配为字节流及挂起式连接/写入 |
+| `:foundation:device-protocol` | Android library | device-api | device-sdk | 环形缓冲、拦截器拆包、校验、连续性及聚合帧解析 |
+| `:foundation:device-command` | Android library | device-api、device-transport | device-sdk | 有界优先级队列、单飞指令、回执、超时与幂等重试 |
+| `:foundation:device-storage` | Android library | device-api | device-sdk | 解析后聚合帧异步文件记录 |
+| `:foundation:device-waveform` | Android library | device-api | device-sdk | ECG/呼吸波形投影和慢消费者隔离 |
+| `:foundation:device-sdk` | Android library | bluetooth、全部 device 子模块 | collection | 设备能力总壳、会话生命周期和自动分发 |
 | `:provider:user` | Android library | ARouter API | home、feature:user | 用户资料数据契约的影响面 |
 | `:provider:collection` | Android library | navi、ARouter API | home、questionnaire、collection | 采集流程状态机契约的影响面 |
 | `:provider:device` | Android library | ARouter API | collection | 最近成功连接设备的持久化查询与保存契约 |
 | `:feature:home` | Android library | common、navi、provider:user、provider:collection | app | 采集入口与任务列表 |
 | `:feature:user` | Android library | common、navi、storage、provider:user | app | 用户资料 Activity、内部 Fragment 与本地资料实现 |
 | `:feature:questionnaire` | Android library | common、navi、provider:collection | app | 前后问卷 Activity 与内部 Fragment |
-| `:feature:collection` | Android library | common、navi、storage、foundation:bluetooth、provider:collection | app | BLE 设备、采集 Activity、内部 Fragment、记录与流程状态机实现 |
+| `:feature:collection` | Android library | common、waveform-ui、navi、storage、foundation:bluetooth、device-api、device-sdk、provider:collection、provider:device | app | BLE 设备、采集 Activity、内部 Fragment、记录与流程状态机实现 |
 | `:feature:analysis` | Android library | common、navi | app | 分析 Activity 与内部 Fragment |
 
 ## 3. 工程分层
 
 - `:app` 是组合层，持有 `VitalHubApplication`、首页 `MainActivity`、系统栏/标题栏、底部导航和首页 Fragment 返回栈。
 - `:core:common` 是跨模块基础层，暴露通用模型与共享 Compose 能力；不应依赖业务 feature。
+- `:core:waveform-ui` 是独立绘制基础层，只接收 `IntArray` 采样和 UI 连线语义；不依赖蓝牙、设备协议或业务 feature。
 - `:core:navi` 是跨模块导航基础层，暴露 `Routes`、`Navigator`、`BaseFlowActivity`、导航宿主接口、页面元数据与导航去重；不依赖业务 feature。
 - `:core:permission` 是跨模块基础层，封装可注入的运行时权限契约、检查、申请、端内拒绝兜底弹窗及设置页跳转；应用层配置权限定义、路由守卫和宿主依赖，功能模块仅在各自 Manifest 声明所需权限。
 - `:core:storage` 是跨模块基础层，封装本地键值存储；业务模块只依赖其公开的 `KVStorage`/`Storage` API，不直接依赖具体存储后端。
 - `:foundation:bluetooth` 是蓝牙基础能力层，封装经典蓝牙与 BLE 的扫描、连接、读写和回调，不依赖业务 feature。
+- `:foundation:device-*` 按 API、传输、协议、指令、存储、波形和总壳拆分；协议层持有环形缓冲和通用拦截器外层，总壳把解析后的同一聚合帧自动分发给不同消费者。
 - `:app` 在 `VitalHubApplication` 中统一初始化 `BluetoothKit` 及扫描规则；业务 feature 只获取并使用已初始化的单例。
 - `:provider:user` 是继承 `IProvider` 的用户资料能力契约层；`:feature:user` 负责资料编辑、MMKV 本地实现及 `/user/service` ARouter 服务注册。
 - `:provider:collection` 是继承 `IProvider` 的采集流程状态机契约层；`:feature:collection` 负责 MMKV 实现及 `/collection/flow/service` 服务注册。
@@ -111,3 +132,4 @@ graph TD
 |---|---|---|
 | 应用壳与路由 | ARouter、Activity/Fragment 宿主、Compose 顶栏与底栏 | `docs/architecture/app-shell.md` |
 | 业务架构概览 | 业务模块职责、核心标识、推荐数据层 | `ARCHITECTURE.md` |
+| 记录仪设备 SDK | BLE 字节流、协议、指令队列、聚合帧、画图与文件消费 | `docs/architecture/device-sdk.md` |

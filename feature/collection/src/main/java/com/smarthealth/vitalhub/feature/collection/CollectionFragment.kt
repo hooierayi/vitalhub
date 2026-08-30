@@ -1,18 +1,30 @@
 package com.smarthealth.vitalhub.feature.collection
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alibaba.android.arouter.facade.annotation.Route
 import com.alibaba.android.arouter.launcher.ARouter
 import com.smarthealth.vitalhub.core.navi.*
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
+import com.smarthealth.vitalhub.core.waveform.rememberRealtimeWaveformState
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProvider
 import com.smarthealth.vitalhub.feature.collection.shared.connectedDevice
+import com.smarthealth.vitalhub.foundation.device.api.CommandResult
+import com.smarthealth.vitalhub.foundation.device.api.ContinuousCollectionSubject
+import com.smarthealth.vitalhub.foundation.device.api.DeviceCommand
+import com.smarthealth.vitalhub.foundation.device.api.FrameContinuity
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
+import com.smarthealth.vitalhub.provider.user.Gender
+import com.smarthealth.vitalhub.provider.user.UserInfoProvider
+import java.io.File
+import java.util.Calendar
+import kotlinx.coroutines.launch
 
 @Route(path = Routes.COLLECTION)
 class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinationOwner {
@@ -39,21 +51,131 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         val bluetoothState = collectionBluetoothProvider.uiState.collectAsStateWithLifecycle().value
         val connectedDevice = bluetoothState.connectedDevice()
         val state = viewModel.uiState.collectAsStateWithLifecycle().value
+        val deviceMetrics = collectionBluetoothProvider.metrics.collectAsStateWithLifecycle().value
+        val latestFrame = collectionBluetoothProvider.frames
+            .collectAsStateWithLifecycle(initialValue = null)
+            .value
+        val ecgWaveformState = rememberRealtimeWaveformState(sampleRateHz = 250)
+        val respirationWaveformState = rememberRealtimeWaveformState(sampleRateHz = 250)
+        LaunchedEffect(collectionBluetoothProvider) {
+            collectionBluetoothProvider.ecgWaveforms.collect { frame ->
+                if (frame.continuity != FrameContinuity.DUPLICATE) {
+                    ecgWaveformState.append(frame.samples)
+                }
+            }
+        }
+        LaunchedEffect(collectionBluetoothProvider) {
+            collectionBluetoothProvider.respirationWaveforms.collect { frame ->
+                if (frame.continuity != FrameContinuity.DUPLICATE) {
+                    respirationWaveformState.append(frame.samples)
+                }
+            }
+        }
+        val diagnostic = collectionBluetoothProvider.diagnostics
+            .collectAsStateWithLifecycle(initialValue = null)
+            .value
         val displayedDevice = connectedDevice ?: bluetoothState.lastConnectedDevice
         val host = requireActivity() as FlowNavigationHost
+        val displayState = state.copy(
+            metrics = deviceMetrics?.let { metrics ->
+                listOf(
+                    VitalMetric("帧序号", metrics.sequence.toString(), "seq"),
+                    VitalMetric("皮温", "%.2f".format(metrics.skinCelsius), "℃"),
+                    VitalMetric("湿度", "%.2f".format(metrics.humidityPercent), "%"),
+                )
+            } ?: state.metrics,
+            deviceDebugInfo = when {
+                bluetoothState.connectionError != null -> bluetoothState.connectionError
+                connectedDevice != null && deviceMetrics == null -> diagnostic
+                    ?: "SDK 已连接，等待记录仪数据帧"
+                deviceMetrics != null -> "SDK 收帧正常 · sequence=${deviceMetrics.sequence}"
+                else -> null
+            },
+        )
         CollectionScreen(
-            state = state,
+            state = displayState,
             device = displayedDevice,
             isDeviceConnected = connectedDevice != null,
+            ecgWaveformState = ecgWaveformState,
+            respirationWaveformState = respirationWaveformState,
+            latestFrame = latestFrame,
             onStartClip = {
-                Navigator.collection(host, state.sessionId, FlowDestination.CLIP_COLLECTION)
+                startClipRecording(host, state.sessionId)
             },
             onStartContinuous = {
-                Navigator.collection(host, state.sessionId, FlowDestination.CONTINUOUS_RECORDING)
+                startContinuous(host, state.sessionId)
             },
-            onStopClip = { finishCollection(state.sessionId) },
-            onFinishContinuous = { finishCollection(state.sessionId) },
+            onStopClip = { stopCollection(state.sessionId) },
+            onFinishContinuous = { stopCollection(state.sessionId) },
         )
+    }
+
+    private fun startClipRecording(host: FlowNavigationHost, sessionId: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val directory = requireContext().getExternalFilesDir("records")
+                ?: File(requireContext().filesDir, "records")
+            val target = File(directory, "$sessionId-${System.currentTimeMillis()}.vhf")
+            runCatching { collectionBluetoothProvider.startRecording(target.absolutePath) }
+                .onSuccess {
+                    Navigator.collection(host, sessionId, FlowDestination.CLIP_COLLECTION)
+                }
+                .onFailure { viewModel.reportDeviceError(it.message ?: "无法创建采集文件") }
+        }
+    }
+
+    private fun startContinuous(host: FlowNavigationHost, sessionId: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val user = runCatching {
+                ARouter.getInstance().navigation(UserInfoProvider::class.java)?.getUser()
+            }.getOrNull()
+            if (user == null) {
+                viewModel.reportDeviceError("未读取到完整用户资料")
+                return@launch
+            }
+            val now = Calendar.getInstance()
+            val command = DeviceCommand.StartContinuous(
+                ContinuousCollectionSubject(
+                    name = user.name,
+                    genderCode = if (user.gender == Gender.MALE) 0x01 else 0x02,
+                    age = user.age,
+                    year = now.get(Calendar.YEAR),
+                    month = now.get(Calendar.MONTH) + 1,
+                    day = now.get(Calendar.DAY_OF_MONTH),
+                    hour = now.get(Calendar.HOUR_OF_DAY),
+                    minute = now.get(Calendar.MINUTE),
+                    second = now.get(Calendar.SECOND),
+                ),
+            )
+            when (val result = collectionBluetoothProvider.execute(command)) {
+                CommandResult.Success -> Navigator.collection(
+                    host,
+                    sessionId,
+                    FlowDestination.CONTINUOUS_RECORDING,
+                )
+                is CommandResult.Rejected -> viewModel.reportDeviceError(
+                    "设备拒绝连续记录，状态码=${result.status}",
+                )
+                is CommandResult.Failed -> viewModel.reportDeviceError(
+                    result.cause.message ?: "连续记录指令失败",
+                )
+            }
+        }
+    }
+
+    private fun stopCollection(sessionId: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = collectionBluetoothProvider.execute(DeviceCommand.StopCollection)
+            runCatching { collectionBluetoothProvider.stopRecording() }
+            when (result) {
+                CommandResult.Success -> finishCollection(sessionId)
+                is CommandResult.Rejected -> viewModel.reportDeviceError(
+                    "设备拒绝停止采集，状态码=${result.status}",
+                )
+                is CommandResult.Failed -> viewModel.reportDeviceError(
+                    result.cause.message ?: "停止采集指令失败",
+                )
+            }
+        }
     }
 
     private fun finishCollection(sessionId: String) {

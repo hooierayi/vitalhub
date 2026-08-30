@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,10 +37,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +47,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
-import kotlin.math.sin
 
 abstract class BaseFlowFragment : Fragment() {
     final override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
@@ -247,40 +242,6 @@ fun MetricRow(vararg metrics: Pair<String, String>) {
             val parts = value.split(" ", limit = 2)
             MetricCard(name, parts.first(), parts.getOrElse(1) { "" })
         }
-    }
-}
-
-@Composable
-fun Waveform(title: String, trailing: String = "", respiratory: Boolean = false, height: Dp = 99.dp) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary)
-        Text(trailing, fontSize = 13.sp, color = VitalColors.TextSecondary)
-    }
-    Canvas(Modifier.fillMaxWidth().height(height).background(Color.White)) {
-        val grid = VitalColors.Grid
-        for (i in 0..18) drawLine(grid, Offset(size.width * i / 18, 0f), Offset(size.width * i / 18, size.height), 1f)
-        for (i in 0..8) drawLine(grid, Offset(0f, size.height * i / 8), Offset(size.width, size.height * i / 8), 1f)
-        val path = Path()
-        val center = size.height / 2f
-        val steps = 220
-        for (index in 0..steps) {
-            val x = size.width * index / steps
-            val y = if (respiratory) {
-                center + sin(index.toFloat() / steps * 11f * Math.PI).toFloat() * size.height * 0.31f
-            } else {
-                val phase = index % 48
-                center + when (phase) {
-                    27 -> -size.height * .11f
-                    28 -> -size.height * .46f
-                    29 -> size.height * .24f
-                    30 -> -size.height * .05f
-                    in 37..40 -> -size.height * .14f
-                    else -> sin(index * .42f) * 1.2f
-                }
-            }
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, if (respiratory) VitalColors.Blue else VitalColors.Success, style = Stroke(width = 2.2f))
     }
 }
 
