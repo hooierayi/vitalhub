@@ -109,7 +109,7 @@ class CollectionFlowActivity : BaseFlowActivity() {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val restartCollection = currentFlowDestination()
                     ?.restartsCollectionAfterReconnect() == true
-                if (!collectionBluetoothProvider.reconnect(restartCollection)) {
+                if (!collectionBluetoothProvider.reconnectFromDisconnectDialog(restartCollection)) {
                     dialog.setMessage("未找到可重新连接的设备，请退出采集后重新选择设备。")
                 }
                 updateConnectionLostDialog(collectionBluetoothProvider.uiState.value)

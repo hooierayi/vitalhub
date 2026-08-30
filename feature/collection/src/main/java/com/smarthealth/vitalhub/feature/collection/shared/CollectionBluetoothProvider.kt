@@ -112,77 +112,94 @@ class CollectionBluetoothProvider(
         _uiState.value = _uiState.value.copy(scanning = false)
     }
 
+    /** Device-page connection: starts collection and publishes the event that opens preview. */
     fun connect(deviceId: String) {
-        connect(
-            deviceId = deviceId,
-            navigateOnSuccess = true,
-            restartCollection = true,
-            rejectedAction = "启动",
-        )
+        if (_uiState.value.connectingDeviceId != null || _uiState.value.connectedDeviceId == deviceId) return
+        val device = findKnownDevice(deviceId) ?: return
+        markConnecting(deviceId)
+        viewModelScope.launch {
+            runCatching { deviceSession.connect(deviceId) }
+                .mapCatching {
+                    requireSuccessfulCommand(
+                        command = DeviceCommand.StartCollection,
+                        rejectedAction = "启动",
+                    )
+                }
+                .onSuccess {
+                    markConnected(device)
+                    connectionEvents.send(Unit)
+                }
+                .onFailure { error -> markConnectionFailed(error) }
+        }
     }
 
-    fun reconnect(restartCollection: Boolean): Boolean {
+    /** Disconnect-dialog reconnection: optionally restores data, but never publishes navigation. */
+    fun reconnectFromDisconnectDialog(restartCollection: Boolean): Boolean {
         val deviceId = _uiState.value.lastConnectedDevice?.key?.takeIf { it.isNotBlank() }
             ?: return false
-        connect(
-            deviceId = deviceId,
-            navigateOnSuccess = false,
-            restartCollection = restartCollection,
-            rejectedAction = "恢复",
-        )
+        if (_uiState.value.connectingDeviceId != null) return true
+        val device = findKnownDevice(deviceId) ?: return false
+        markConnecting(deviceId)
+        viewModelScope.launch {
+            runCatching { deviceSession.connect(deviceId) }
+                .mapCatching {
+                    if (restartCollection) {
+                        requireSuccessfulCommand(
+                            command = DeviceCommand.StartCollection,
+                            rejectedAction = "恢复",
+                        )
+                    }
+                }
+                .onSuccess { markConnected(device) }
+                .onFailure { error -> markConnectionFailed(error) }
+        }
         return true
     }
 
-    private fun connect(
-        deviceId: String,
-        navigateOnSuccess: Boolean,
-        restartCollection: Boolean,
-        rejectedAction: String,
-    ) {
-        if (_uiState.value.connectingDeviceId != null || _uiState.value.connectedDeviceId == deviceId) return
-        val device = _uiState.value.scannedDevices.firstOrNull { it.key == deviceId }
+    private fun findKnownDevice(deviceId: String): BluetoothKitDevice? =
+        _uiState.value.scannedDevices.firstOrNull { it.key == deviceId }
             ?: _uiState.value.lastConnectedDevice?.takeIf { it.key == deviceId }
-            ?: return
 
+    private fun markConnecting(deviceId: String) {
         stopScan()
         _uiState.value = _uiState.value.copy(
             scanning = false,
             connectingDeviceId = deviceId,
             connectionError = null,
         )
-        viewModelScope.launch {
-            runCatching { deviceSession.connect(deviceId) }
-                .mapCatching {
-                    if (restartCollection) {
-                        when (val result = deviceSession.execute(DeviceCommand.StartCollection)) {
-                            CommandResult.Success -> Unit
-                            is CommandResult.Rejected -> error(
-                                "设备拒绝${rejectedAction}采集，状态码=${result.status}",
-                            )
-                            is CommandResult.Failed -> throw result.cause
-                        }
-                    }
-                }
-                .onSuccess {
-                    persistLastConnectedDevice(device)
-                    _uiState.value = _uiState.value.copy(
-                        connectingDeviceId = null,
-                        connectedDeviceId = deviceId,
-                        lastConnectedDevice = device,
-                        connectionError = null,
-                    )
-                    if (navigateOnSuccess) connectionEvents.send(Unit)
-                }
-                .onFailure { error ->
-                    runCatching { deviceSession.disconnect() }
-                    _uiState.value = _uiState.value.copy(
-                        connectingDeviceId = null,
-                        connectedDeviceId = null,
-                        connectionError = error.message
-                            ?: "连接失败，请确认设备已开启并靠近手机",
-                    )
-                }
+    }
+
+    private fun markConnected(device: BluetoothKitDevice) {
+        persistLastConnectedDevice(device)
+        _uiState.value = _uiState.value.copy(
+            connectingDeviceId = null,
+            connectedDeviceId = device.key,
+            lastConnectedDevice = device,
+            connectionError = null,
+        )
+    }
+
+    private suspend fun requireSuccessfulCommand(
+        command: DeviceCommand,
+        rejectedAction: String,
+    ) {
+        when (val result = deviceSession.execute(command)) {
+            CommandResult.Success -> Unit
+            is CommandResult.Rejected -> error(
+                "设备拒绝${rejectedAction}采集，状态码=${result.status}",
+            )
+            is CommandResult.Failed -> throw result.cause
         }
+    }
+
+    private suspend fun markConnectionFailed(error: Throwable) {
+        runCatching { deviceSession.disconnect() }
+        _uiState.value = _uiState.value.copy(
+            connectingDeviceId = null,
+            connectedDeviceId = null,
+            connectionError = error.message
+                ?: "连接失败，请确认设备已开启并靠近手机",
+        )
     }
 
     fun disconnect(deviceId: String) {
