@@ -13,11 +13,16 @@ import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
 
 @Route(path = Routes.QUESTIONNAIRE_FRAGMENT)
-class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestinationOwner {
+class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, AppBarActionDestination, FlowDestinationOwner {
     private val viewModel by viewModels<QuestionnaireViewModel>()
+    private var importActionVisible = false
 
     override val appBarTitle: String
         get() = if (arguments?.getString(RouteArgs.QUESTIONNAIRE_PHASE) == QuestionnairePhase.POST) "采集后问卷" else "采集前问卷"
+    override val appBarActionLabel: String?
+        get() = "导入上次记录".takeIf { importActionVisible }
+
+    override fun onAppBarAction() = viewModel.importPreviousAnswers()
     override val flowDestinationContext: FlowDestinationContext
         get() = FlowDestinationContext(
             destination = if (arguments?.getString(RouteArgs.QUESTIONNAIRE_PHASE) == QuestionnairePhase.POST) {
@@ -31,6 +36,7 @@ class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestina
     override fun onCreate(savedInstanceState: Bundle?) {
         QuestionnaireAnswerStores.initialize(requireContext())
         super.onCreate(savedInstanceState)
+        importActionVisible = viewModel.hasPreviousRecord
     }
 
     @Composable

@@ -102,7 +102,7 @@ graph TD
 | `:foundation:device-sdk` | Android library | bluetooth、全部 device 子模块 | collection | 设备能力总壳、会话生命周期和自动分发 |
 | `:provider:user` | Android library | ARouter API | app、home、collection、analysis、feature:user | 用户资料、指纹及历史关联查询契约的影响面 |
 | `:provider:collection` | Android library | navi、ARouter API | home、questionnaire、collection | 采集流程状态机契约的影响面 |
-| `:provider:device` | Android library | ARouter API、bluetooth | collection、analysis | 最近成功连接设备、名称和 MAC 地址的查询与保存契约 |
+| `:provider:device` | Android library | ARouter API、bluetooth | collection、analysis | 最近成功连接设备的 `DeviceInfo`、内部写卡记录及兼容设备对象契约 |
 | `:provider:record` | Android library | ARouter API、Coroutines | app、collection | 已完成采集记录的查询、观察与保存契约 |
 | `:feature:home` | Android library | common、navi、provider:user、provider:collection | app | 采集入口与任务列表 |
 | `:feature:user` | Android library | common、navi、provider:user、Room | app | 用户资料 Activity、内部 Fragment 与 Room 用户资料实现 |
@@ -126,7 +126,7 @@ graph TD
 - `:app` 在 `VitalHubApplication` 中统一初始化 `BluetoothKit` 及扫描规则；业务 feature 只获取并使用已初始化的单例。
 - `:provider:user` 是继承 `IProvider` 的用户资料能力契约层；`:feature:user` 负责资料编辑、Room 用户表、指纹与 active/inactive 状态切换及 `/user/service` ARouter 服务注册。
 - `:provider:collection` 是继承 `IProvider` 的采集流程状态机契约层；`:feature:collection` 负责 MMKV 实现及 `/collection/flow/service` 服务注册。
-- `:provider:device` 是继承 `IProvider` 的最近连接设备契约层；`:feature:collection` 负责 MMKV 实现，并提供当前设备、名称和 MAC 地址及 `/device/service` 服务注册。
+- `:provider:device` 是继承 `IProvider` 的最近连接设备契约层；Parcelable `DeviceInfo` 保存设备名称、MAC 和可选的设备内部写卡 `DeviceRecordInfo`，并通过 `getRecordInfo()` 单独暴露写卡记录。`:feature:collection` 将其作为单个对象持久化，负责 MMKV 实现及 `/device/service` 服务注册；写入统一使用 `saveDevice(DeviceInfo)`，旧层仅保留设备对象、名称和 MAC 查询接口。
 - `:provider:record` 是继承 `IProvider` 的完成记录契约层；`:feature:collection` 负责 Room 实现及 `/record/service` 服务注册，`:app` 只通过契约查询。
 - feature 模块不直接依赖彼此，使用 ARouter 路径经 `Navigator` 跳转。
 - 三个 `:debug:dokit-*` 模块只消费 foundation 暴露的惰性调试快照，不被业务模块依赖；工具以宿主 Activity 内可拖动的数据卡片展示并保留完整详情页，不申请系统悬浮窗权限。DoKit SDK 只存在于 app debug 运行时，release 不打包悬浮卡片或面板 Activity。

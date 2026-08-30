@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProviderState
+import com.smarthealth.vitalhub.feature.collection.shared.DeviceConnectionOperation
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKitDevice
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,7 @@ data class CollectionFlowHomeUiState(
     val deviceOrderIds: List<String> = emptyList(),
     val lastConnectedDevice: BluetoothKitDevice? = null,
     val selectedAvailableDeviceId: String? = null,
-    val connectingDeviceId: String? = null,
+    val deviceOperation: DeviceConnectionOperation? = null,
     val connectedDeviceId: String? = null,
     val connectionError: String? = null,
     val flowError: String? = null,
@@ -81,7 +82,7 @@ internal fun CollectionFlowHomeUiState.withBluetoothState(
     scanning = bluetoothState.scanning,
     scannedDevices = bluetoothState.scannedDevices,
     lastConnectedDevice = bluetoothState.lastConnectedDevice,
-    connectingDeviceId = bluetoothState.connectingDeviceId,
+    deviceOperation = bluetoothState.deviceOperation,
     connectedDeviceId = bluetoothState.connectedDeviceId,
     connectionError = bluetoothState.connectionError,
 )
@@ -101,7 +102,7 @@ class CollectionFlowHomeViewModel(savedStateHandle: SavedStateHandle) : ViewMode
 
     fun selectAvailableDevice(deviceId: String, bluetoothState: CollectionBluetoothProviderState) {
         val combinedState = _uiState.value.withBluetoothState(bluetoothState)
-        if (combinedState.connectingDeviceId != null) return
+        if (combinedState.deviceOperation != null) return
         if (combinedState.availableDevice()?.key == combinedState.connectedDeviceId) return
         if (combinedState.scannedDevices.none { it.key == deviceId }) return
         val selectedState = combinedState.withSelectedAvailableDevice(deviceId)

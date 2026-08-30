@@ -17,7 +17,7 @@
 | ARouter Provider 实现 | 具体业务 feature | 跨模块 Provider 必须实现 `IProvider` 并通过唯一 `@Route` 注册 |
 | 事务宿主 | `MainActivity` 与 `BaseFlowActivity` 的 `FlowNavigationHost` 实现 | 各 Activity 统一管理自己的 FragmentTransaction、动画和返回栈 |
 | 顶级导航标记 | `BottomNavigationDestination` | 顶级页面实现后，应用壳显示底栏 |
-| 标题栏元数据 | `AppBarDestination` | 页面通过接口声明标题和返回按钮，不重复绘制标题栏 |
+| 标题栏元数据 | `AppBarDestination`、`AppBarActionDestination` | 页面通过接口声明标题、返回按钮及可选文字操作，不重复绘制标题栏 |
 
 当前用户资料编辑 Activity 路由为 `/user/edit`，由 `:feature:user` 的 `UserActivity` 注册；内部 Fragment 路由为 `/user/edit/content`。采集 Activity 路由为 `/collection/flow`，内部采集流程首页和采集 Fragment 分别为 `/collection/flow/home` 与 `/collection/main`。首页“采集前问卷、数据采集、采集后问卷”三步流程由 `CollectionFlowProvider` 的 `/collection/flow/service` 服务读取和更新；设备连接属于数据采集内部瞬态，不单独作为持久化检查点。
 
@@ -34,6 +34,7 @@
 - 当前 `UserInfoProvider` 以 `/user/service` 注册，调用方通过 `ARouter.navigation(UserInfoProvider::class.java)` 获取；不维护手写注册表或由 `Application` 手动安装实现。
 - 当前 `CollectionFlowProvider` 以 `/collection/flow/service` 注册，由首页和流程模块通过 `ARouter.navigation(CollectionFlowProvider::class.java)` 获取；Provider 只保存三项业务流程检查点，不保存设备连接和采集中的硬件瞬态。
 - 当前 `RecordProvider` 以 `/record/service` 注册，由采集模块保存完成记录、app 记录页观察全部记录；Room 实现不暴露到契约或 app。
+- 进入 `/collection/flow` 前由应用层用户资料拦截器查询 `UserInfoProvider`；无完整资料时中断原路由并重定向 `/user/edit`。该拦截器先于蓝牙权限守卫执行，避免在用户资料未就绪时提前申请设备权限。
 
 ## 3. UI 壳约束
 

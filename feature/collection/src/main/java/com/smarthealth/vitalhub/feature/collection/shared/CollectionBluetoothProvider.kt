@@ -5,6 +5,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.alibaba.android.arouter.launcher.ARouter
+import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothGattDevice
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKit
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKitDevice
 import com.smarthealth.vitalhub.foundation.bluetooth.callback.BluetoothScanCallback
@@ -13,6 +14,7 @@ import com.smarthealth.vitalhub.foundation.device.api.DeviceCommand
 import com.smarthealth.vitalhub.foundation.device.sdk.ProtocolByteOrder
 import com.smarthealth.vitalhub.foundation.device.sdk.RecorderDeviceSdk
 import com.smarthealth.vitalhub.foundation.device.sdk.RecorderDeviceSdkConfig
+import com.smarthealth.vitalhub.provider.device.DeviceInfo
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,11 +30,16 @@ import kotlinx.coroutines.runBlocking
 
 private const val BLUETOOTH_STATE_CONNECTED = 2
 
+enum class DeviceConnectionOperation {
+    CONNECTING,
+    DISCONNECTING,
+}
+
 data class CollectionBluetoothProviderState(
     val scanning: Boolean = false,
     val scannedDevices: List<BluetoothKitDevice> = emptyList(),
     val lastConnectedDevice: BluetoothKitDevice? = null,
-    val connectingDeviceId: String? = null,
+    val deviceOperation: DeviceConnectionOperation? = null,
     val connectedDeviceId: String? = null,
     val connectionError: String? = null,
 )
@@ -114,9 +121,13 @@ class CollectionBluetoothProvider(
 
     /** Device-page connection: starts collection and publishes the event that opens preview. */
     fun connect(deviceId: String) {
-        if (_uiState.value.connectingDeviceId != null || _uiState.value.connectedDeviceId == deviceId) return
+        val state = _uiState.value
+        if (
+            state.deviceOperation != null ||
+            state.connectedDeviceId == deviceId
+        ) return
         val device = findKnownDevice(deviceId) ?: return
-        markConnecting(deviceId)
+        markConnecting()
         viewModelScope.launch {
             runCatching { deviceSession.connect(deviceId) }
                 .mapCatching {
@@ -137,9 +148,9 @@ class CollectionBluetoothProvider(
     fun reconnectFromDisconnectDialog(restartCollection: Boolean): Boolean {
         val deviceId = _uiState.value.lastConnectedDevice?.key?.takeIf { it.isNotBlank() }
             ?: return false
-        if (_uiState.value.connectingDeviceId != null) return true
+        if (_uiState.value.deviceOperation != null) return true
         val device = findKnownDevice(deviceId) ?: return false
-        markConnecting(deviceId)
+        markConnecting()
         viewModelScope.launch {
             runCatching { deviceSession.connect(deviceId) }
                 .mapCatching {
@@ -160,11 +171,11 @@ class CollectionBluetoothProvider(
         _uiState.value.scannedDevices.firstOrNull { it.key == deviceId }
             ?: _uiState.value.lastConnectedDevice?.takeIf { it.key == deviceId }
 
-    private fun markConnecting(deviceId: String) {
+    private fun markConnecting() {
         stopScan()
         _uiState.value = _uiState.value.copy(
             scanning = false,
-            connectingDeviceId = deviceId,
+            deviceOperation = DeviceConnectionOperation.CONNECTING,
             connectionError = null,
         )
     }
@@ -172,7 +183,7 @@ class CollectionBluetoothProvider(
     private fun markConnected(device: BluetoothKitDevice) {
         persistLastConnectedDevice(device)
         _uiState.value = _uiState.value.copy(
-            connectingDeviceId = null,
+            deviceOperation = null,
             connectedDeviceId = device.key,
             lastConnectedDevice = device,
             connectionError = null,
@@ -195,7 +206,7 @@ class CollectionBluetoothProvider(
     private suspend fun markConnectionFailed(error: Throwable) {
         runCatching { deviceSession.disconnect() }
         _uiState.value = _uiState.value.copy(
-            connectingDeviceId = null,
+            deviceOperation = null,
             connectedDeviceId = null,
             connectionError = error.message
                 ?: "连接失败，请确认设备已开启并靠近手机",
@@ -204,13 +215,20 @@ class CollectionBluetoothProvider(
 
     fun disconnect(deviceId: String) {
         val state = _uiState.value
-        if (state.connectedDeviceId != deviceId) return
+        if (
+            state.connectedDeviceId != deviceId ||
+            state.deviceOperation != null
+        ) return
+        _uiState.value = state.copy(
+            deviceOperation = DeviceConnectionOperation.DISCONNECTING,
+            connectionError = null,
+        )
         viewModelScope.launch {
             runCatching { deviceSession.execute(DeviceCommand.StopCollection) }
             runCatching { deviceSession.disconnect() }
-            _uiState.value = state.copy(
+            _uiState.value = _uiState.value.copy(
                 connectedDeviceId = null,
-                connectingDeviceId = null,
+                deviceOperation = null,
                 connectionError = null,
             )
         }
@@ -224,7 +242,10 @@ class CollectionBluetoothProvider(
 
     @SuppressLint("MissingPermission")
     fun startScan() {
-        if (_uiState.value.scanning || _uiState.value.connectingDeviceId != null) return
+        if (
+            _uiState.value.scanning ||
+            _uiState.value.deviceOperation != null
+        ) return
         val generation = ++scanGeneration
         _uiState.value = _uiState.value.copy(scanning = true, connectionError = null)
         bluetoothKit.startLeCan(object : BluetoothScanCallback() {
@@ -255,10 +276,17 @@ class CollectionBluetoothProvider(
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun restoreLastConnectedDevice(): BluetoothKitDevice? = deviceProvider.getCurrentDevice()
 
+    @SuppressLint("MissingPermission")
     private fun persistLastConnectedDevice(device: BluetoothKitDevice) {
-        deviceProvider.saveDevice(device)
+        deviceProvider.saveDevice(
+            DeviceInfo(
+                address = device.key,
+                name = device.bluetoothDevice?.name,
+            ),
+        )
     }
 
     override fun onCleared() {
@@ -266,7 +294,7 @@ class CollectionBluetoothProvider(
         runBlocking { deviceSession.close() }
         _uiState.value = _uiState.value.copy(
             scanning = false,
-            connectingDeviceId = null,
+            deviceOperation = null,
             connectedDeviceId = null,
         )
         super.onCleared()

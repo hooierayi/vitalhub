@@ -3,7 +3,10 @@ package com.smarthealth.vitalhub.feature.collection.device
 import android.os.Parcelable
 import com.smarthealth.vitalhub.core.storage.KVStorage
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothGattDevice
+import com.smarthealth.vitalhub.provider.device.DeviceInfo
+import com.smarthealth.vitalhub.provider.device.DeviceRecordInfo
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,27 +14,63 @@ import org.junit.Test
 class DeviceProviderImplTest {
     @Test
     fun `returns null before a device is stored`() {
-        assertNull(createProvider(FakeDeviceStorage()).getCurrentDevice())
+        val provider = createProvider(FakeDeviceStorage())
+
+        assertNull(provider.getDeviceInfo())
+        assertNull(provider.getRecordInfo())
+        assertNull(provider.getCurrentDevice())
     }
 
     @Test
-    fun `stores and restores the last connected device`() {
-        val provider = createProvider(FakeDeviceStorage())
-        val device = ProviderTestBluetoothGattDevice(
-            deviceKey = "AA:BB",
-            scanRecord = byteArrayOf(0x01, 0x7f, 0xff.toByte()),
-            rssi = -61,
-            timestampNanos = 1_234L,
+    fun `stores and restores device info with card-writing record`() {
+        val storage = FakeDeviceStorage()
+        val provider = createProvider(storage)
+        val deviceInfo = DeviceInfo(
+            address = "AA:BB",
+            name = "Recorder",
+            record = DeviceRecordInfo(
+                id = "REC-1",
+                startedAtEpochMillis = 1_000L,
+            ),
         )
 
-        assertTrue(provider.saveDevice(device))
+        assertTrue(provider.saveDevice(deviceInfo))
+        assertTrue(storage.contains("device_info"))
+        assertFalse(storage.contains("device_address"))
+        assertEquals(deviceInfo, provider.getDeviceInfo())
+        assertEquals(deviceInfo.record, provider.getRecordInfo())
         assertEquals("AA:BB", provider.getCurrentDeviceAddress())
+        assertEquals("Recorder", provider.getCurrentDeviceName())
 
         val restoredDevice = provider.getCurrentDevice() as BluetoothGattDevice
-        assertEquals(device.key, restoredDevice.key)
+        assertEquals(deviceInfo.address, restoredDevice.key)
         assertNull(restoredDevice.scanRecord)
         assertEquals(0, restoredDevice.rssi)
         assertEquals(0L, restoredDevice.timestampNanos)
+    }
+
+    @Test
+    fun `updating the same device without a record preserves its record`() {
+        val provider = createProvider(FakeDeviceStorage())
+        val record = DeviceRecordInfo(id = "REC-1", startedAtEpochMillis = 1_000L)
+        assertTrue(provider.saveDevice(DeviceInfo(address = "AA:BB", record = record)))
+
+        assertTrue(provider.saveDevice(DeviceInfo(address = "AA:BB", name = "Recorder")))
+
+        assertEquals(record, provider.getRecordInfo())
+        assertEquals("Recorder", provider.getDeviceInfo()?.name)
+    }
+
+    @Test
+    fun `saving a different device does not inherit the previous record`() {
+        val provider = createProvider(FakeDeviceStorage())
+        val record = DeviceRecordInfo(id = "REC-1", startedAtEpochMillis = 1_000L)
+        assertTrue(provider.saveDevice(DeviceInfo(address = "AA:BB", record = record)))
+
+        assertTrue(provider.saveDevice(DeviceInfo(address = "CC:DD", name = "Other")))
+
+        assertNull(provider.getRecordInfo())
+        assertEquals("CC:DD", provider.getDeviceInfo()?.address)
     }
 
     private fun createProvider(storage: KVStorage): DeviceProviderImpl =
@@ -58,7 +97,8 @@ private class FakeDeviceStorage : KVStorage {
     override fun getDouble(key: String, defaultValue: Double): Double = values[key] as? Double ?: defaultValue
     override fun getLong(key: String, defaultValue: Long): Long = values[key] as? Long ?: defaultValue
     override fun getString(key: String, defaultValue: String?): String? = values[key] as? String ?: defaultValue
-    override fun <T : Parcelable> getParcelable(key: String, clazz: Class<T>, defaultValue: T?): T? = defaultValue
+    override fun <T : Parcelable> getParcelable(key: String, clazz: Class<T>, defaultValue: T?): T? =
+        clazz.cast(values[key]) ?: defaultValue
     override fun edit(): KVStorage.Editor = Editor(values)
 
     private class Editor(private val values: MutableMap<String, Any>) : KVStorage.Editor {

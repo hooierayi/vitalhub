@@ -51,6 +51,7 @@ import androidx.compose.ui.zIndex
 import com.smarthealth.vitalhub.core.ui.*
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothGattDevice
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKitDevice
+import com.smarthealth.vitalhub.feature.collection.shared.DeviceConnectionOperation
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -108,7 +109,7 @@ fun CollectionFlowHomeScreen(
         val currentAvailableId = availableDevice?.key ?: return
         if (
             activeSwap != null ||
-            state.connectingDeviceId != null ||
+            state.deviceOperation != null ||
             availableDeviceConnected ||
             currentAvailableId == targetDeviceId
         ) return
@@ -160,7 +161,7 @@ fun CollectionFlowHomeScreen(
                 device = availableDevice,
                 remembered = availableDevice.key == state.lastConnectedDevice?.key,
                 modifier = measuredCardModifier(availableDevice.key),
-                connecting = availableDevice.key == state.connectingDeviceId,
+                operation = state.deviceOperation,
                 connected = availableDeviceConnected,
                 selectAction = if (availableDeviceConnected) onContinue else null,
                 primaryAction = {
@@ -309,7 +310,7 @@ private fun DeviceCard(
     device: BluetoothKitDevice,
     remembered: Boolean,
     modifier: Modifier = Modifier,
-    connecting: Boolean = false,
+    operation: DeviceConnectionOperation? = null,
     connected: Boolean = false,
     connectProgress: Float = 1f,
     selectAction: (() -> Unit)? = null,
@@ -346,12 +347,14 @@ private fun DeviceCard(
                     ) {
                         FullWidthButton(
                             label = when {
+                                operation == DeviceConnectionOperation.DISCONNECTING -> "断开中…"
                                 connected -> "断开设备"
-                                connecting -> "连接中…"
+                                operation == DeviceConnectionOperation.CONNECTING -> "连接中…"
                                 else -> "连接"
                             },
                             style = if (connected) FlowButtonStyle.DANGER else FlowButtonStyle.PRIMARY,
                             onClick = action,
+                            loading = operation != null,
                         )
                     }
                 }

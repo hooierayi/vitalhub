@@ -1,6 +1,5 @@
 package com.smarthealth.vitalhub.feature.analysis
 
-import android.annotation.SuppressLint
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -123,13 +122,11 @@ private inline fun <reified T> resolveProvider(): T? = runCatching {
     ARouter.getInstance().navigation(T::class.java)
 }.getOrNull()
 
-@SuppressLint("MissingPermission")
 private fun resolveDeviceName(provider: DeviceProvider?): String = runCatching {
-    provider?.getCurrentDeviceName()?.takeIf(String::isNotBlank)
-        ?: provider?.getCurrentDevice()?.let { device ->
-            device.bluetoothDevice?.name?.takeIf(String::isNotBlank)
-                ?: device.key.takeIf(String::isNotBlank)
-        }
+    provider?.getDeviceInfo()?.let { device ->
+        device.name?.takeIf(String::isNotBlank)
+            ?: device.address.takeIf(String::isNotBlank)
+    }
 }.getOrNull() ?: "-"
 
 private fun formatCollectionTime(epochMillis: Long): String =

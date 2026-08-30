@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smarthealth.vitalhub.core.navi.CollectionMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
+import com.smarthealth.vitalhub.provider.device.DeviceRecordInfo
 import com.smarthealth.vitalhub.provider.record.CollectionRecord
 import com.smarthealth.vitalhub.provider.record.RecordType
 import java.text.SimpleDateFormat
@@ -27,9 +28,11 @@ data class CollectionUiState(
     val clipElapsed: String = "00:00",
     val clipRemaining: String = formatClipClock(CollectionConfig.CLIP_DURATION_SECONDS),
     val clipProgress: Float = 0f,
-    val isClipCollecting: Boolean = true,
+    val isClipCollecting: Boolean = false,
     val clipCountdownFinished: Boolean = false,
-    val recordingElapsed: String = "02:36:18",
+    val isContinuousRecording: Boolean = false,
+    val isContinuousStartLoading: Boolean = false,
+    val recordingElapsed: String = "00:00:00",
     val recordId: String = "REC20240521001",
     val startedAt: String = "2024-05-21  09:41:32",
     val flowError: String? = null,
@@ -41,7 +44,9 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
     private val recordId = savedStateHandle.get<String>(RECORD_ID_KEY)
         ?: "REC-${UUID.randomUUID().toString().replace("-", "").take(12)}"
             .also { savedStateHandle[RECORD_ID_KEY] = it }
-    private val continuousStartedAt = if (mode == CollectionMode.CONTINUOUS) {
+    private val isContinuousRecording = mode == CollectionMode.CONTINUOUS &&
+        savedStateHandle.get<Boolean>(CONTINUOUS_IS_RECORDING_KEY) == true
+    private val continuousStartedAt = if (isContinuousRecording) {
         savedStateHandle.get<Long>(RECORD_STARTED_AT_KEY)
             ?: System.currentTimeMillis().also { savedStateHandle[RECORD_STARTED_AT_KEY] = it }
     } else {
@@ -51,14 +56,19 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty(),
         mode = mode,
         recordId = recordId,
+        isContinuousRecording = isContinuousRecording,
+        recordingElapsed = continuousStartedAt.takeIf { it > 0L }
+            ?.let { formatContinuousElapsed(System.currentTimeMillis() - it) }
+            ?: "00:00:00",
         startedAt = continuousStartedAt.takeIf { it > 0L }?.let(::formatRecordTime).orEmpty(),
     ))
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
     private var clipTimerJob: Job? = null
+    private var continuousTimerJob: Job? = null
 
     init {
         if (_uiState.value.mode == CollectionMode.CLIP) {
-            val isCollecting = savedStateHandle.get<Boolean>(CLIP_IS_COLLECTING_KEY) ?: true
+            val isCollecting = savedStateHandle.get<Boolean>(CLIP_IS_COLLECTING_KEY) ?: false
             if (isCollecting) {
                 val startedAt = savedStateHandle.get<Long>(CLIP_STARTED_AT_KEY)
                     ?: System.currentTimeMillis().also { savedStateHandle[CLIP_STARTED_AT_KEY] = it }
@@ -72,6 +82,15 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
                     countdownFinished = savedStateHandle.get<Boolean>(CLIP_COMPLETION_PENDING_KEY) == true,
                 )
             }
+        } else if (_uiState.value.isContinuousRecording) {
+            val timerAnchor = System.currentTimeMillis()
+            startContinuousTimer(
+                initialElapsedMillis = continuousElapsedAtEntry(
+                    enteredAtEpochMillis = timerAnchor,
+                    recordStartedAtEpochMillis = continuousStartedAt,
+                ),
+                timerAnchorEpochMillis = timerAnchor,
+            )
         }
     }
 
@@ -102,22 +121,76 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         _uiState.value = _uiState.value.copy(startedAt = formatRecordTime(startedAt))
     }
 
+    fun markContinuousRecordingStarted(): Long {
+        val startedAt = System.currentTimeMillis()
+        savedStateHandle[RECORD_STARTED_AT_KEY] = startedAt
+        savedStateHandle[CONTINUOUS_IS_RECORDING_KEY] = true
+        _uiState.value = _uiState.value.copy(
+            isContinuousRecording = true,
+            recordingElapsed = "00:00:00",
+            startedAt = formatRecordTime(startedAt),
+            flowError = null,
+        )
+        startContinuousTimer(
+            initialElapsedMillis = 0L,
+            timerAnchorEpochMillis = startedAt,
+        )
+        return startedAt
+    }
+
+    fun beginContinuousStart(): Boolean {
+        val state = _uiState.value
+        if (state.isContinuousStartLoading) return false
+        _uiState.value = state.copy(
+            isContinuousStartLoading = true,
+            flowError = null,
+        )
+        return true
+    }
+
+    fun finishContinuousStart() {
+        _uiState.value = _uiState.value.copy(isContinuousStartLoading = false)
+    }
+
+    fun restoreContinuousRecord(
+        record: DeviceRecordInfo,
+        enteredAtEpochMillis: Long = System.currentTimeMillis(),
+    ) {
+        if (mode != CollectionMode.CONTINUOUS) return
+        if (record.id.isBlank() || record.startedAtEpochMillis <= 0L) return
+        val initialElapsedMillis = continuousElapsedAtEntry(
+            enteredAtEpochMillis = enteredAtEpochMillis,
+            recordStartedAtEpochMillis = record.startedAtEpochMillis,
+        )
+        savedStateHandle[RECORD_ID_KEY] = record.id
+        savedStateHandle[RECORD_STARTED_AT_KEY] = record.startedAtEpochMillis
+        savedStateHandle[CONTINUOUS_IS_RECORDING_KEY] = true
+        _uiState.value = _uiState.value.copy(
+            recordId = record.id,
+            startedAt = formatRecordTime(record.startedAtEpochMillis),
+            recordingElapsed = formatContinuousElapsed(initialElapsedMillis),
+            isContinuousRecording = true,
+            isContinuousStartLoading = false,
+            flowError = null,
+        )
+        startContinuousTimer(
+            initialElapsedMillis = initialElapsedMillis,
+            timerAnchorEpochMillis = enteredAtEpochMillis,
+        )
+    }
+
     fun completedRecord(
         userFingerprint: String,
         deviceAddress: String,
         recordedAtEpochMillis: Long = System.currentTimeMillis(),
     ): CollectionRecord? {
         val state = _uiState.value
-        val type = when (state.mode) {
-            CollectionMode.CLIP -> RecordType.CLIP
-            CollectionMode.CONTINUOUS -> RecordType.CONTINUOUS
-            else -> return null
-        }
+        if (state.mode != CollectionMode.CLIP) return null
         val startedAt = savedStateHandle.get<Long>(RECORD_STARTED_AT_KEY) ?: return null
         return CollectionRecord(
             id = recordId,
             sessionId = state.sessionId,
-            type = type,
+            type = RecordType.CLIP,
             recordedAtEpochMillis = recordedAtEpochMillis,
             durationMillis = (recordedAtEpochMillis - startedAt).coerceAtLeast(0L),
             localFilePath = savedStateHandle.get(RECORD_FILE_PATH_KEY),
@@ -137,6 +210,12 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
 
     fun reportDeviceError(message: String) {
         _uiState.value = _uiState.value.copy(flowError = message)
+    }
+
+    fun clearFlowError(expectedMessage: String) {
+        if (_uiState.value.flowError == expectedMessage) {
+            _uiState.value = _uiState.value.copy(flowError = null)
+        }
     }
 
     private fun startClipTimer(startedAt: Long) {
@@ -160,6 +239,25 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
                 )
                 if (remainingMillis > 0L) delay(PROGRESS_UPDATE_INTERVAL_MILLIS)
             } while (remainingMillis > 0L)
+        }
+    }
+
+    private fun startContinuousTimer(
+        initialElapsedMillis: Long,
+        timerAnchorEpochMillis: Long,
+    ) {
+        continuousTimerJob?.cancel()
+        continuousTimerJob = viewModelScope.launch {
+            while (true) {
+                val elapsedSinceEntry = (System.currentTimeMillis() - timerAnchorEpochMillis)
+                    .coerceAtLeast(0L)
+                _uiState.value = _uiState.value.copy(
+                    recordingElapsed = formatContinuousElapsed(
+                        initialElapsedMillis + elapsedSinceEntry,
+                    ),
+                )
+                delay(CONTINUOUS_TIMER_INTERVAL_MILLIS)
+            }
         }
     }
 
@@ -195,6 +293,8 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         const val CLIP_IS_COLLECTING_KEY = "clipIsCollecting"
         const val CLIP_COMPLETION_PENDING_KEY = "clipCompletionPending"
         const val PROGRESS_UPDATE_INTERVAL_MILLIS = 100L
+        const val CONTINUOUS_TIMER_INTERVAL_MILLIS = 1_000L
+        const val CONTINUOUS_IS_RECORDING_KEY = "continuousIsRecording"
         const val RECORD_ID_KEY = "recordId"
         const val RECORD_STARTED_AT_KEY = "recordStartedAt"
         const val RECORD_FILE_PATH_KEY = "recordFilePath"
@@ -205,3 +305,16 @@ private fun formatRecordTime(epochMillis: Long): String = SimpleDateFormat(
     "yyyy-MM-dd  HH:mm:ss",
     Locale.getDefault(),
 ).format(Date(epochMillis))
+
+private fun formatContinuousElapsed(elapsedMillis: Long): String {
+    val elapsedSeconds = elapsedMillis.coerceAtLeast(0L) / 1_000L
+    val hours = elapsedSeconds / 3_600L
+    val minutes = (elapsedSeconds % 3_600L) / 60L
+    val seconds = elapsedSeconds % 60L
+    return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
+}
+
+internal fun continuousElapsedAtEntry(
+    enteredAtEpochMillis: Long,
+    recordStartedAtEpochMillis: Long,
+): Long = (enteredAtEpochMillis - recordStartedAtEpochMillis).coerceAtLeast(0L)

@@ -64,6 +64,8 @@ abstract class BaseFlowActivity : AppCompatActivity(), FlowNavigationHost {
                         FlowTitleBar(
                             title = appBarState.title,
                             showBack = appBarState.showBack,
+                            actionLabel = appBarState.actionLabel,
+                            onAction = appBarState.onAction,
                             onBack = { onBackPressedDispatcher.onBackPressed() },
                         )
                     }
@@ -156,14 +158,19 @@ abstract class BaseFlowActivity : AppCompatActivity(), FlowNavigationHost {
 
     private fun updateAppBar(fragment: Fragment) {
         val destination = fragment as? AppBarDestination
+        val actionDestination = fragment as? AppBarActionDestination
         appBarState = AppBarState(
             title = destination?.appBarTitle.orEmpty(),
             showBack = destination?.showAppBarBack ?: true,
+            actionLabel = actionDestination?.appBarActionLabel,
+            onAction = actionDestination?.let { { it.onAppBarAction() } } ?: {},
         )
     }
 
     private data class AppBarState(
         val title: String = "",
         val showBack: Boolean = true,
+        val actionLabel: String? = null,
+        val onAction: () -> Unit = {},
     )
 }

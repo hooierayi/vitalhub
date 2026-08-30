@@ -19,13 +19,14 @@ import com.smarthealth.vitalhub.foundation.device.api.DeviceCommand
 import com.smarthealth.vitalhub.foundation.device.api.FrameContinuity
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
-import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
+import com.smarthealth.vitalhub.provider.device.DeviceRecordInfo
 import com.smarthealth.vitalhub.provider.record.RecordProvider
 import com.smarthealth.vitalhub.provider.user.Gender
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import java.io.File
 import java.util.Calendar
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Route(path = Routes.COLLECTION)
@@ -81,6 +82,23 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             .value
         val displayedDevice = connectedDevice ?: bluetoothState.lastConnectedDevice
         val host = requireActivity() as FlowNavigationHost
+        LaunchedEffect(state.mode) {
+            if (state.mode == CollectionMode.CONTINUOUS) {
+                val enteredAtEpochMillis = System.currentTimeMillis()
+                runCatching { resolveDeviceProvider()?.getRecordInfo() }
+                    .getOrNull()
+                    ?.let { record ->
+                        viewModel.restoreContinuousRecord(record, enteredAtEpochMillis)
+                    }
+            }
+        }
+        LaunchedEffect(state.mode, state.flowError) {
+            val error = state.flowError
+            if (state.mode == CollectionMode.CONTINUOUS && error != null) {
+                delay(CONTINUOUS_ERROR_DISPLAY_MILLIS)
+                viewModel.clearFlowError(error)
+            }
+        }
         LaunchedEffect(state.clipCountdownFinished) {
             if (state.clipCountdownFinished) {
                 viewModel.consumeClipCountdownFinished()
@@ -111,88 +129,83 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             respirationWaveformState = respirationWaveformState,
             latestFrame = latestFrame,
             onStartClip = {
-                startClipRecording(host, state.sessionId)
+                openClipPage(host, state.sessionId)
             },
             onStartContinuous = {
-                startContinuous(host, state.sessionId)
+                openContinuousPage(host, state.sessionId)
+            },
+            onPreview = {
+                returnToPreview(host, state.sessionId, state.isClipCollecting)
             },
             onStopClip = { pauseClipCollection() },
             onRestartClip = { restartClipRecording(state.sessionId) },
-            onFinishContinuous = { stopCollection(state.sessionId) },
+            onStartContinuousRecording = { startContinuousRecording() },
         )
     }
 
-    private fun startClipRecording(host: FlowNavigationHost, sessionId: String) {
+    private fun openClipPage(host: FlowNavigationHost, sessionId: String) {
+        Navigator.collection(
+            host,
+            sessionId,
+            FlowDestination.CLIP_COLLECTION,
+            entryMode = flowEntryMode,
+        )
+    }
+
+    private fun openContinuousPage(host: FlowNavigationHost, sessionId: String) {
+        Navigator.collection(
+            host,
+            sessionId,
+            FlowDestination.CONTINUOUS_RECORDING,
+            entryMode = flowEntryMode,
+        )
+    }
+
+    private fun startContinuousRecording() {
+        if (!viewModel.beginContinuousStart()) return
         viewLifecycleOwner.lifecycleScope.launch {
-            val directory = requireContext().getExternalFilesDir("records")
-                ?: File(requireContext().filesDir, "records")
-            val target = File(directory, "$sessionId-${System.currentTimeMillis()}.vhf")
-            runCatching { collectionBluetoothProvider.startRecording(target.absolutePath) }
-                .onSuccess {
-                    viewModel.markLocalRecordingStarted(target.absolutePath)
-                    Navigator.collection(
-                        host,
-                        sessionId,
-                        FlowDestination.CLIP_COLLECTION,
-                        entryMode = flowEntryMode,
+            try {
+                val user = runCatching {
+                    ARouter.getInstance().navigation(UserInfoProvider::class.java)?.getUser()
+                }.getOrNull()
+                if (user == null) {
+                    viewModel.reportDeviceError("未读取到完整用户资料")
+                    return@launch
+                }
+                val now = Calendar.getInstance()
+                val command = DeviceCommand.StartContinuous(
+                    ContinuousCollectionSubject(
+                        name = user.name,
+                        genderCode = if (user.gender == Gender.MALE) 0x01 else 0x02,
+                        age = user.age,
+                        year = now.get(Calendar.YEAR),
+                        month = now.get(Calendar.MONTH) + 1,
+                        day = now.get(Calendar.DAY_OF_MONTH),
+                        hour = now.get(Calendar.HOUR_OF_DAY),
+                        minute = now.get(Calendar.MINUTE),
+                        second = now.get(Calendar.SECOND),
+                    ),
+                )
+                when (val result = collectionBluetoothProvider.execute(command)) {
+                    CommandResult.Success -> {
+                        val startedAt = viewModel.markContinuousRecordingStarted()
+                        val record = DeviceRecordInfo(
+                            id = viewModel.uiState.value.recordId,
+                            startedAtEpochMillis = startedAt,
+                        )
+                        if (!saveDeviceRecord(record)) {
+                            viewModel.reportDeviceError("连续记录已启动，但设备写卡记录保存失败")
+                        }
+                    }
+                    is CommandResult.Rejected -> viewModel.reportDeviceError(
+                        "设备拒绝启动记录，状态码=${result.status}",
+                    )
+                    is CommandResult.Failed -> viewModel.reportDeviceError(
+                        result.cause.message ?: "启动记录指令失败",
                     )
                 }
-                .onFailure { viewModel.reportDeviceError(it.message ?: "无法创建采集文件") }
-        }
-    }
-
-    private fun startContinuous(host: FlowNavigationHost, sessionId: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val user = runCatching {
-                ARouter.getInstance().navigation(UserInfoProvider::class.java)?.getUser()
-            }.getOrNull()
-            if (user == null) {
-                viewModel.reportDeviceError("未读取到完整用户资料")
-                return@launch
-            }
-            val now = Calendar.getInstance()
-            val command = DeviceCommand.StartContinuous(
-                ContinuousCollectionSubject(
-                    name = user.name,
-                    genderCode = if (user.gender == Gender.MALE) 0x01 else 0x02,
-                    age = user.age,
-                    year = now.get(Calendar.YEAR),
-                    month = now.get(Calendar.MONTH) + 1,
-                    day = now.get(Calendar.DAY_OF_MONTH),
-                    hour = now.get(Calendar.HOUR_OF_DAY),
-                    minute = now.get(Calendar.MINUTE),
-                    second = now.get(Calendar.SECOND),
-                ),
-            )
-            when (val result = collectionBluetoothProvider.execute(command)) {
-                CommandResult.Success -> Navigator.collection(
-                    host,
-                    sessionId,
-                    FlowDestination.CONTINUOUS_RECORDING,
-                    entryMode = flowEntryMode,
-                )
-                is CommandResult.Rejected -> viewModel.reportDeviceError(
-                    "设备拒绝连续记录，状态码=${result.status}",
-                )
-                is CommandResult.Failed -> viewModel.reportDeviceError(
-                    result.cause.message ?: "连续记录指令失败",
-                )
-            }
-        }
-    }
-
-    private fun stopCollection(sessionId: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = collectionBluetoothProvider.execute(DeviceCommand.StopCollection)
-            runCatching { collectionBluetoothProvider.stopRecording() }
-            when (result) {
-                CommandResult.Success -> finishCollection(sessionId)
-                is CommandResult.Rejected -> viewModel.reportDeviceError(
-                    "设备拒绝停止采集，状态码=${result.status}",
-                )
-                is CommandResult.Failed -> viewModel.reportDeviceError(
-                    result.cause.message ?: "停止采集指令失败",
-                )
+            } finally {
+                viewModel.finishContinuousStart()
             }
         }
     }
@@ -205,6 +218,31 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
                     viewModel.stopClipTimer()
                     viewModel.reportDeviceError(it.message ?: "停止本地记录失败")
                 }
+        }
+    }
+
+    private fun returnToPreview(
+        host: FlowNavigationHost,
+        sessionId: String,
+        isCollecting: Boolean,
+    ) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (isCollecting) {
+                runCatching { collectionBluetoothProvider.stopRecording() }
+                    .onFailure { viewModel.reportDeviceError(it.message ?: "停止本地记录失败") }
+                viewModel.stopClipTimer()
+            }
+            if (parentFragmentManager.backStackEntryCount > 0) {
+                requireActivity().onBackPressedDispatcher.onBackPressed()
+            } else {
+                Navigator.collection(
+                    host,
+                    sessionId,
+                    FlowDestination.LIVE_PREVIEW,
+                    addToBackStack = false,
+                    entryMode = flowEntryMode,
+                )
+            }
         }
     }
 
@@ -248,39 +286,11 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         }
     }
 
-    private suspend fun finishCollection(sessionId: String) {
-        if (!saveCompletedRecord()) {
-            viewModel.reportDeviceError("采集已结束，但记录保存失败，请稍后重试")
-            return
-        }
-        val transition = runCatching {
-            ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
-                ?.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
-        }.getOrNull()
-        if (flowEntryMode == FlowEntryMode.DIRECT_RETURN_HOME) {
-            Navigator.returnHome(requireContext())
-            return
-        }
-        when (transition) {
-            is CollectionFlowTransition.Applied,
-            is CollectionFlowTransition.AlreadyApplied -> {
-                Navigator.flow(
-                    requireContext(),
-                    sessionId,
-                    requireNotNull(transition.nextDestination),
-                )
-            }
-            else -> viewModel.reportFlowError()
-        }
-    }
-
     private suspend fun saveCompletedRecord(): Boolean {
         val user = runCatching {
             ARouter.getInstance().navigation(UserInfoProvider::class.java)?.getUser()
         }.getOrNull()
-        val deviceAddress = runCatching {
-            ARouter.getInstance().navigation(DeviceProvider::class.java)?.getCurrentDeviceAddress()
-        }.getOrNull()
+        val deviceAddress = resolveDeviceProvider()?.getDeviceInfo()?.address
         val record = viewModel.completedRecord(
             userFingerprint = user?.fingerprint ?: return false,
             deviceAddress = deviceAddress ?: return false,
@@ -288,5 +298,19 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         return runCatching {
             ARouter.getInstance().navigation(RecordProvider::class.java)?.saveRecord(record) == true
         }.getOrDefault(false)
+    }
+
+    private fun saveDeviceRecord(record: DeviceRecordInfo): Boolean {
+        val provider = resolveDeviceProvider() ?: return false
+        val deviceInfo = provider.getDeviceInfo() ?: return false
+        return provider.saveDevice(deviceInfo.copy(record = record))
+    }
+
+    private fun resolveDeviceProvider(): DeviceProvider? = runCatching {
+        ARouter.getInstance().navigation(DeviceProvider::class.java)
+    }.getOrNull()
+
+    private companion object {
+        const val CONTINUOUS_ERROR_DISPLAY_MILLIS = 3_000L
     }
 }

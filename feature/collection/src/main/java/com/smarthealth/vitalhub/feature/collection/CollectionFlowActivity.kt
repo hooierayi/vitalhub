@@ -18,6 +18,7 @@ import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProvider
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProviderState
+import com.smarthealth.vitalhub.feature.collection.shared.DeviceConnectionOperation
 import kotlinx.coroutines.launch
 
 internal fun FlowDestination.showsConnectionLostDialog(): Boolean = this in setOf(
@@ -128,7 +129,7 @@ class CollectionFlowActivity : BaseFlowActivity() {
         val reconnectButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
         when {
             state.connectedDeviceId != null -> dialog.dismiss()
-            state.connectingDeviceId != null -> {
+            state.deviceOperation == DeviceConnectionOperation.CONNECTING -> {
                 dialog.setMessage("正在重新连接记录仪，请稍候…")
                 reconnectButton.isEnabled = false
             }

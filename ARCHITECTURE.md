@@ -77,8 +77,9 @@ Fragment 宿主，Fragment 作为内部 ARouter 路由入口和生命周期容�
 ## 核心标识
 
 - `sessionId`：一次用户采集任务，关联前后问卷、设备、片段、上传与诊断结果。
-- `recordId`：记录仪创建的连续记录文件标识。
-- 完成记录：片段采集倒计时结束或连续记录正常结束后，由 `feature:collection` 写入 Room；记录仅以 `userFingerprint` 和 `deviceAddress` 逻辑关联 Provider 数据，不创建设备表。`app` 的记录页通过 `RecordProvider` 观察全部记录并按记录时间倒序展示。
+- `DeviceRecordInfo.id`：App 为一次设备内部连续写卡操作生成的本地跟踪标识；设备协议回执当前不提供设备侧文件编号。
+- 采集上传记录：片段采集倒计时结束后，由 `feature:collection` 将本地文件摘要写入 Room；记录仅以 `userFingerprint` 和 `deviceAddress` 逻辑关联 Provider 数据，不创建设备表。`app` 的记录页通过 `RecordProvider` 观察全部记录并按记录时间倒序展示。
+- 设备写卡记录：连续记录启停状态保存在 `DeviceProvider` 的 `DeviceInfo.record` 中，不写入采集上传记录表。
 - 当前设备协议没有请求 ID：控制指令通过有界优先级队列严格单飞，以响应码匹配回执；只有明确幂等的命令允许超时重试。
 
 首页采集流程固定为“采集前问卷、数据采集、采集后问卷”三步。前问卷、正常结束采集和

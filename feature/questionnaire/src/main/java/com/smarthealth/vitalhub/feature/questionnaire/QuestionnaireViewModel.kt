@@ -49,17 +49,18 @@ class QuestionnaireViewModel internal constructor(
     private val sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty()
     private val pages = if (isPre) prePages else postPages
     private val answerCount = if (isPre) 9 else 5
-    private val restoredDraft = answerStore.load(sessionId, phase, answerCount)
+    private val previousDraft = answerStore.load(sessionId, phase, answerCount)
     private val _uiState = MutableStateFlow(
         QuestionnaireUiState(
             sessionId = sessionId,
             isPre = isPre,
             pages = pages,
-            pageIndex = restoredDraft?.pageIndex?.coerceIn(0, pages.lastIndex) ?: 0,
-            answers = restoredDraft?.answers ?: List(answerCount) { "" },
+            pageIndex = 0,
+            answers = List(answerCount) { "" },
         ),
     )
     val uiState: StateFlow<QuestionnaireUiState> = _uiState.asStateFlow()
+    val hasPreviousRecord: Boolean get() = previousDraft != null
 
     fun answer(questionId: Int, answer: String) {
         val state = _uiState.value
@@ -73,6 +74,17 @@ class QuestionnaireViewModel internal constructor(
 
     fun reportFlowError(message: String = "采集流程暂不可用，请稍后重试") {
         _uiState.value = _uiState.value.copy(flowError = message)
+    }
+
+    fun importPreviousAnswers() {
+        val draft = previousDraft ?: return
+        val updated = _uiState.value.copy(
+            answers = draft.answers,
+            validationError = false,
+            flowError = null,
+        )
+        _uiState.value = updated
+        persist(updated, submitted = false)
     }
 
     fun previousPage() {

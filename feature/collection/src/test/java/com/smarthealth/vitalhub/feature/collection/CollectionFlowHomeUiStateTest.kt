@@ -1,6 +1,7 @@
 package com.smarthealth.vitalhub.feature.collection
 
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProviderState
+import com.smarthealth.vitalhub.feature.collection.shared.DeviceConnectionOperation
 import com.smarthealth.vitalhub.feature.collection.shared.isConnectedBluetoothState
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKitDevice
 import org.junit.Assert.assertEquals
@@ -151,6 +152,7 @@ class CollectionFlowHomeUiStateTest {
             CollectionBluetoothProviderState(
                 scanning = true,
                 scannedDevices = listOf(projectDevice),
+                deviceOperation = DeviceConnectionOperation.DISCONNECTING,
                 connectionError = "connection error",
             ),
         )
@@ -160,6 +162,7 @@ class CollectionFlowHomeUiStateTest {
         assertEquals("flow error", combinedState.flowError)
         assertEquals(true, combinedState.scanning)
         assertEquals(listOf(projectDevice), combinedState.scannedDevices)
+        assertEquals(DeviceConnectionOperation.DISCONNECTING, combinedState.deviceOperation)
         assertEquals("connection error", combinedState.connectionError)
     }
 

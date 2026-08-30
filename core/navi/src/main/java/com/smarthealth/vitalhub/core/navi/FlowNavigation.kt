@@ -69,6 +69,12 @@ interface AppBarDestination {
     val showNotificationAction: Boolean get() = false
 }
 
+/** Optional text action rendered on the right side of a feature Activity title bar. */
+interface AppBarActionDestination {
+    val appBarActionLabel: String?
+    fun onAppBarAction()
+}
+
 object BottomNavigationKeys {
     const val COLLECTION = "collection"
     const val RECORDS = "records"

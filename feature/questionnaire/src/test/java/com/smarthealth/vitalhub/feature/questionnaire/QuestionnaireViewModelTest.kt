@@ -31,14 +31,25 @@ class QuestionnaireViewModelTest {
     }
 
     @Test
-    fun answers_areRestoredForTheSameSessionAndPhase() {
+    fun openingQuestionnaire_doesNotRestoreSavedAnswersUntilImported() {
         val store = FakeQuestionnaireAnswerStore()
         val first = createViewModel(store)
         first.answer(0, "6至7小时")
 
         val restored = createViewModel(store)
 
+        assertEquals("", restored.uiState.value.answers[0])
+        assertTrue(restored.hasPreviousRecord)
+        restored.importPreviousAnswers()
         assertEquals("6至7小时", restored.uiState.value.answers[0])
+        assertEquals("6至7小时", store.lastSaved?.answers?.get(0))
+    }
+
+    @Test
+    fun questionnaireWithoutPreviousRecord_hidesImportAction() {
+        val viewModel = createViewModel()
+
+        assertEquals(false, viewModel.hasPreviousRecord)
     }
 
     private fun createViewModel(store: QuestionnaireAnswerStore = FakeQuestionnaireAnswerStore()) =
@@ -55,6 +66,8 @@ class QuestionnaireViewModelTest {
 
 private class FakeQuestionnaireAnswerStore : QuestionnaireAnswerStore {
     private var draft: QuestionnaireDraft? = null
+    var lastSaved: QuestionnaireDraft? = null
+        private set
 
     override fun load(sessionId: String, phase: String, answerCount: Int): QuestionnaireDraft? = draft
 
@@ -65,7 +78,8 @@ private class FakeQuestionnaireAnswerStore : QuestionnaireAnswerStore {
         pageIndex: Int,
         submitted: Boolean,
     ): Boolean {
-        draft = QuestionnaireDraft(answers.toList(), pageIndex, submitted)
+        lastSaved = QuestionnaireDraft(answers.toList(), pageIndex, submitted)
+        draft = lastSaved
         return true
     }
 }

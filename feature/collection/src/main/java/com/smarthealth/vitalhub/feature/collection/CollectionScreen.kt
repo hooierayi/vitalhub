@@ -4,8 +4,10 @@ import android.annotation.SuppressLint
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,7 +19,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -45,9 +51,10 @@ fun CollectionScreen(
     latestFrame: RecorderFrame?,
     onStartClip: () -> Unit,
     onStartContinuous: () -> Unit,
+    onPreview: () -> Unit,
     onStopClip: () -> Unit,
     onRestartClip: () -> Unit,
-    onFinishContinuous: () -> Unit,
+    onStartContinuousRecording: () -> Unit,
 ) {
     when (state.mode) {
         CollectionMode.CLIP -> ClipPage(
@@ -57,10 +64,16 @@ fun CollectionScreen(
             ecgWaveformState = ecgWaveformState,
             respirationWaveformState = respirationWaveformState,
             latestFrame = latestFrame,
+            onPreview = onPreview,
             onStop = onStopClip,
             onRestart = onRestartClip,
         )
-        CollectionMode.CONTINUOUS -> ContinuousPage(state, device, onStartClip, onFinishContinuous)
+        CollectionMode.CONTINUOUS -> ContinuousPage(
+            state = state,
+            device = device,
+            onPreview = onPreview,
+            onStart = onStartContinuousRecording,
+        )
         else -> PreviewPage(
             state,
             device,
@@ -100,7 +113,7 @@ private fun PreviewPage(
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             FlowButton("采集上传", FlowButtonStyle.OUTLINE, Modifier.weight(1f), onStartClip)
-            FlowButton("连续记录", FlowButtonStyle.BLUE, Modifier.weight(1f), onStartContinuous)
+            FlowButton("连续记录", FlowButtonStyle.PRIMARY, Modifier.weight(1f), onStartContinuous)
         }
         Spacer(Modifier.height(9.dp))
     }
@@ -350,6 +363,7 @@ private fun ClipPage(
     ecgWaveformState: RealtimeWaveformState,
     respirationWaveformState: RealtimeWaveformState,
     latestFrame: RecorderFrame?,
+    onPreview: () -> Unit,
     onStop: () -> Unit,
     onRestart: () -> Unit,
 ) {
@@ -368,12 +382,55 @@ private fun ClipPage(
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
         Spacer(Modifier.height(12.dp))
-        if (state.isClipCollecting) {
-            FullWidthButton("停止采集", FlowButtonStyle.DANGER, onStop)
-        } else {
-            FullWidthButton("开始采集", FlowButtonStyle.PRIMARY, onRestart)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RealtimePreviewAction(onClick = onPreview)
+            FlowButton(
+                label = if (state.isClipCollecting) "停止采集" else "开始采集",
+                style = if (state.isClipCollecting) FlowButtonStyle.DANGER else FlowButtonStyle.PRIMARY,
+                modifier = Modifier.weight(1f).height(51.dp),
+                onClick = if (state.isClipCollecting) onStop else onRestart,
+            )
         }
         Spacer(Modifier.height(9.dp))
+    }
+}
+
+@Composable
+private fun RealtimePreviewAction(onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(72.dp)
+            .height(51.dp)
+            .clickable(role = Role.Button, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Canvas(Modifier.size(27.dp)) {
+            val path = Path().apply {
+                moveTo(0f, size.height * 0.55f)
+                lineTo(size.width * 0.22f, size.height * 0.55f)
+                lineTo(size.width * 0.34f, size.height * 0.30f)
+                lineTo(size.width * 0.48f, size.height * 0.78f)
+                lineTo(size.width * 0.64f, size.height * 0.43f)
+                lineTo(size.width * 0.76f, size.height * 0.55f)
+                lineTo(size.width, size.height * 0.55f)
+            }
+            drawPath(
+                path = path,
+                color = VitalColors.Teal,
+                style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
+            )
+        }
+        Text(
+            text = "实时预览",
+            color = VitalColors.Teal,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
@@ -429,7 +486,7 @@ private fun ClipSummaryCard(state: CollectionUiState) {
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Text(
-                    if (state.isClipCollecting) "正在采集 $durationLabel 片段" else "采集已停止",
+                    if (state.isClipCollecting) "正在采集 $durationLabel 片段" else "等待开始采集",
                     fontSize = if (compact) 12.sp else 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = VitalColors.TextPrimary,
@@ -459,20 +516,50 @@ private fun ClipSummaryCard(state: CollectionUiState) {
 
 @SuppressLint("MissingPermission")
 @Composable
-private fun ContinuousPage(state: CollectionUiState, device: BluetoothKitDevice?, onClip: () -> Unit, onFinish: () -> Unit) {
+private fun ContinuousPage(
+    state: CollectionUiState,
+    device: BluetoothKitDevice?,
+    onPreview: () -> Unit,
+    onStart: () -> Unit,
+) {
     FlowPage(scrollable = false) {
-        state.flowError?.let { Text(it, color = VitalColors.Danger, fontSize = 14.sp) }
         InfoCard(background = Color(0xFFF5FBF9), padding = PaddingValues(17.dp), spacing = 0.dp) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(15.dp).background(VitalColors.Success, CircleShape)); Text("记录中", Modifier.padding(start = 10.dp), fontSize = 21.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(15.dp).background(if (state.isContinuousRecording) VitalColors.Success else VitalColors.TextMuted, CircleShape)); Text(if (state.isContinuousRecording) "记录中" else "等待启动", Modifier.padding(start = 10.dp), fontSize = 21.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary) }
             Text(state.recordingElapsed, Modifier.fillMaxWidth().padding(vertical = 14.dp), textAlign = TextAlign.Center, fontSize = 37.sp, fontWeight = FontWeight.Medium, color = Color.Black)
-            KeyValueRow("记录编号", state.recordId); Spacer(Modifier.height(8.dp)); KeyValueRow("开始时间", state.startedAt); Spacer(Modifier.height(15.dp))
+            KeyValueRow("记录编号", state.recordId); Spacer(Modifier.height(8.dp)); KeyValueRow("开始时间", state.startedAt.ifBlank { "-" }); Spacer(Modifier.height(15.dp))
             InfoCard(padding = PaddingValues(14.dp), spacing = 10.dp) {
                 KeyValueRow("设备", device?.bluetoothDevice?.name?.takeIf(String::isNotBlank) ?: "-")
+                KeyValueRow("MAC", device?.key?.takeIf(String::isNotBlank) ?: "-")
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 15.dp).background(Color(0xFFF4F7FB), RoundedCornerShape(9.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Info, null, tint = VitalColors.Blue, modifier = Modifier.size(23.dp)); Text("APP断开后设备仍会继续记录", Modifier.padding(start = 9.dp), fontSize = 14.sp, color = VitalColors.TextPrimary) }
+        state.flowError?.let {
+            Text(
+                text = it,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                color = VitalColors.Danger,
+                fontSize = 14.sp,
+            )
+        }
         Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) { FlowButton("采集 ${formatClipDurationLabel(state.clipDurationSeconds)}片段", FlowButtonStyle.OUTLINE, Modifier.weight(1f), onClip); FlowButton("结束连续记录", FlowButtonStyle.DANGER, Modifier.weight(1f), onFinish) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RealtimePreviewAction(onClick = onPreview)
+            FlowButton(
+                label = when {
+                    state.isContinuousStartLoading -> "启动中"
+                    state.isContinuousRecording -> "记录中（点击可重新启动记录）"
+                    else -> "启动记录"
+                },
+                style = FlowButtonStyle.PRIMARY,
+                modifier = Modifier.weight(1f).height(51.dp),
+                onClick = onStart,
+                loading = state.isContinuousStartLoading,
+            )
+        }
         Spacer(Modifier.height(9.dp))
     }
 }

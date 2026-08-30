@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -187,36 +190,85 @@ fun FlowButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    loading: Boolean = false,
 ) {
     val color = when (style) {
         FlowButtonStyle.PRIMARY, FlowButtonStyle.OUTLINE -> VitalColors.Teal
         FlowButtonStyle.BLUE -> VitalColors.Blue
         FlowButtonStyle.DANGER -> VitalColors.Danger
     }
+    val interactionEnabled = enabled && !loading
     if (style == FlowButtonStyle.OUTLINE) {
         OutlinedButton(
             onClick = onClick,
-            enabled = enabled,
+            enabled = interactionEnabled,
             modifier = modifier.height(51.dp),
             shape = RoundedCornerShape(7.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = if (enabled) 1f else 0.38f)),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                color.copy(alpha = if (interactionEnabled) 1f else 0.38f),
+            ),
             contentPadding = PaddingValues(horizontal = 14.dp),
-        ) { Text(label, color = color.copy(alpha = if (enabled) 1f else 0.38f), fontSize = 16.sp, fontWeight = FontWeight.Medium) }
+        ) {
+            FlowButtonContent(
+                label = label,
+                loading = loading,
+                color = color.copy(alpha = if (interactionEnabled) 1f else 0.38f),
+            )
+        }
     } else {
         Button(
             onClick = onClick,
-            enabled = enabled,
+            enabled = interactionEnabled,
             modifier = modifier.height(51.dp),
             shape = RoundedCornerShape(7.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = color),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = color,
+                disabledContainerColor = color.copy(alpha = 0.62f),
+                disabledContentColor = Color.White.copy(alpha = 0.88f),
+            ),
             contentPadding = PaddingValues(horizontal = 14.dp),
-        ) { Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium) }
+        ) {
+            FlowButtonContent(label = label, loading = loading)
+        }
     }
 }
 
 @Composable
-fun FullWidthButton(label: String, style: FlowButtonStyle = FlowButtonStyle.PRIMARY, onClick: () -> Unit) {
-    FlowButton(label, style, Modifier.fillMaxWidth(), onClick)
+private fun FlowButtonContent(
+    label: String,
+    loading: Boolean,
+    color: Color = LocalContentColor.current,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = color,
+                strokeWidth = 2.dp,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(label, color = color, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+fun FullWidthButton(
+    label: String,
+    style: FlowButtonStyle = FlowButtonStyle.PRIMARY,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+) {
+    FlowButton(
+        label = label,
+        style = style,
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        enabled = enabled,
+        loading = loading,
+    )
 }
 
 @Composable
