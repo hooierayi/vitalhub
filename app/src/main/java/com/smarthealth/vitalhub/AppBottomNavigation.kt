@@ -30,8 +30,8 @@ private data class BottomItem(val key: String, val label: String, val icon: Imag
 private val bottomItems = listOf(
     BottomItem(BottomNavigationKeys.COLLECTION, "采集", Icons.Default.Home),
     BottomItem(BottomNavigationKeys.RECORDS, "记录", Icons.Outlined.CheckCircle),
-    BottomItem(BottomNavigationKeys.REPORTS, "报告", Icons.Outlined.Info),
-    BottomItem(BottomNavigationKeys.PROFILE, "我的", Icons.Default.Person),
+//    BottomItem(BottomNavigationKeys.REPORTS, "报告", Icons.Outlined.Info),
+//    BottomItem(BottomNavigationKeys.PROFILE, "我的", Icons.Default.Person),
 )
 
 @Composable
