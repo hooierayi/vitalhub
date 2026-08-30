@@ -15,12 +15,14 @@ import com.smarthealth.vitalhub.foundation.device.sdk.RecorderDeviceSdk
 import com.smarthealth.vitalhub.foundation.device.sdk.RecorderDeviceSdkConfig
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
@@ -75,6 +77,7 @@ class CollectionBluetoothProvider(
         ARouter.getInstance().navigation(DeviceProvider::class.java),
     ) { "DeviceProvider is not registered." }
     private val connectionEvents = Channel<Unit>(Channel.BUFFERED)
+    private val mutableConnectionLostEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var scanGeneration = 0
 
     private val _uiState = MutableStateFlow(
@@ -84,6 +87,7 @@ class CollectionBluetoothProvider(
     )
     val uiState: StateFlow<CollectionBluetoothProviderState> = _uiState.asStateFlow()
     val connectionSucceeded = connectionEvents.receiveAsFlow()
+    val connectionLostEvents: SharedFlow<Unit> = mutableConnectionLostEvents
     val frames = deviceSession.frames
     val ecgWaveforms = deviceSession.ecgWaveforms
     val respirationWaveforms = deviceSession.respirationWaveforms
@@ -96,6 +100,7 @@ class CollectionBluetoothProvider(
             deviceSession.connected.drop(1).collect { connected ->
                 if (!connected && _uiState.value.connectedDeviceId != null) {
                     _uiState.value = _uiState.value.copy(connectedDeviceId = null)
+                    mutableConnectionLostEvents.tryEmit(Unit)
                 }
             }
         }
@@ -107,7 +112,16 @@ class CollectionBluetoothProvider(
         _uiState.value = _uiState.value.copy(scanning = false)
     }
 
-    fun connect(deviceId: String) {
+    fun connect(deviceId: String) = connect(deviceId, navigateOnSuccess = true)
+
+    fun reconnect(): Boolean {
+        val deviceId = _uiState.value.lastConnectedDevice?.key?.takeIf { it.isNotBlank() }
+            ?: return false
+        connect(deviceId, navigateOnSuccess = false)
+        return true
+    }
+
+    private fun connect(deviceId: String, navigateOnSuccess: Boolean) {
         if (_uiState.value.connectingDeviceId != null || _uiState.value.connectedDeviceId == deviceId) return
         val device = _uiState.value.scannedDevices.firstOrNull { it.key == deviceId }
             ?: _uiState.value.lastConnectedDevice?.takeIf { it.key == deviceId }
@@ -136,7 +150,7 @@ class CollectionBluetoothProvider(
                         lastConnectedDevice = device,
                         connectionError = null,
                     )
-                    connectionEvents.send(Unit)
+                    if (navigateOnSuccess) connectionEvents.send(Unit)
                 }
                 .onFailure { error ->
                     runCatching { deviceSession.disconnect() }
