@@ -57,19 +57,6 @@ internal fun CollectionBluetoothProviderState.connectedDevice(): BluetoothKitDev
         knownDevices().firstOrNull { it.key == connectedId }
     }
 
-internal fun reconnectCommandAfter(
-    current: DeviceCommand?,
-    executed: DeviceCommand,
-    result: CommandResult,
-): DeviceCommand? {
-    if (result != CommandResult.Success) return current
-    return when (executed) {
-        DeviceCommand.StartCollection -> executed
-        is DeviceCommand.StartContinuous -> null
-        DeviceCommand.StopCollection -> DeviceCommand.StartCollection
-    }
-}
-
 /** Activity-scoped Bluetooth state and operations shared by the collection flow. */
 class CollectionBluetoothProvider(
     application: Application,
@@ -92,8 +79,6 @@ class CollectionBluetoothProvider(
     private val connectionEvents = Channel<Unit>(Channel.BUFFERED)
     private val mutableConnectionLostEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var scanGeneration = 0
-    @Volatile
-    private var reconnectCommand: DeviceCommand? = DeviceCommand.StartCollection
 
     private val _uiState = MutableStateFlow(
         CollectionBluetoothProviderState(
@@ -128,21 +113,22 @@ class CollectionBluetoothProvider(
     }
 
     fun connect(deviceId: String) {
-        reconnectCommand = DeviceCommand.StartCollection
         connect(
             deviceId = deviceId,
             navigateOnSuccess = true,
-            startCommand = DeviceCommand.StartCollection,
+            restartCollection = true,
+            rejectedAction = "启动",
         )
     }
 
-    fun reconnect(): Boolean {
+    fun reconnect(restartCollection: Boolean): Boolean {
         val deviceId = _uiState.value.lastConnectedDevice?.key?.takeIf { it.isNotBlank() }
             ?: return false
         connect(
             deviceId = deviceId,
             navigateOnSuccess = false,
-            startCommand = reconnectCommand,
+            restartCollection = restartCollection,
+            rejectedAction = "恢复",
         )
         return true
     }
@@ -150,7 +136,8 @@ class CollectionBluetoothProvider(
     private fun connect(
         deviceId: String,
         navigateOnSuccess: Boolean,
-        startCommand: DeviceCommand?,
+        restartCollection: Boolean,
+        rejectedAction: String,
     ) {
         if (_uiState.value.connectingDeviceId != null || _uiState.value.connectedDeviceId == deviceId) return
         val device = _uiState.value.scannedDevices.firstOrNull { it.key == deviceId }
@@ -166,10 +153,12 @@ class CollectionBluetoothProvider(
         viewModelScope.launch {
             runCatching { deviceSession.connect(deviceId) }
                 .mapCatching {
-                    startCommand?.let { command ->
-                        when (val result = executeAndRemember(command)) {
+                    if (restartCollection) {
+                        when (val result = deviceSession.execute(DeviceCommand.StartCollection)) {
                             CommandResult.Success -> Unit
-                            is CommandResult.Rejected -> error("设备拒绝恢复采集，状态码=${result.status}")
+                            is CommandResult.Rejected -> error(
+                                "设备拒绝${rejectedAction}采集，状态码=${result.status}",
+                            )
                             is CommandResult.Failed -> throw result.cause
                         }
                     }
@@ -200,7 +189,7 @@ class CollectionBluetoothProvider(
         val state = _uiState.value
         if (state.connectedDeviceId != deviceId) return
         viewModelScope.launch {
-            runCatching { executeAndRemember(DeviceCommand.StopCollection) }
+            runCatching { deviceSession.execute(DeviceCommand.StopCollection) }
             runCatching { deviceSession.disconnect() }
             _uiState.value = state.copy(
                 connectedDeviceId = null,
@@ -210,13 +199,7 @@ class CollectionBluetoothProvider(
         }
     }
 
-    suspend fun execute(command: DeviceCommand): CommandResult = executeAndRemember(command)
-
-    private suspend fun executeAndRemember(command: DeviceCommand): CommandResult {
-        val result = deviceSession.execute(command)
-        reconnectCommand = reconnectCommandAfter(reconnectCommand, command, result)
-        return result
-    }
+    suspend fun execute(command: DeviceCommand): CommandResult = deviceSession.execute(command)
 
     suspend fun startRecording(targetPath: String) = deviceSession.startRecording(targetPath)
 

@@ -26,6 +26,11 @@ internal fun FlowDestination.showsConnectionLostDialog(): Boolean = this in setO
     FlowDestination.CONTINUOUS_RECORDING,
 )
 
+internal fun FlowDestination.restartsCollectionAfterReconnect(): Boolean = this in setOf(
+    FlowDestination.LIVE_PREVIEW,
+    FlowDestination.CLIP_COLLECTION,
+)
+
 /** Owns the connected device and collection Fragment stack for one collection session. */
 @Route(path = Routes.COLLECTION_FLOW)
 class CollectionFlowActivity : BaseFlowActivity() {
@@ -83,11 +88,13 @@ class CollectionFlowActivity : BaseFlowActivity() {
     }
 
     private fun isCollectionPageVisible(): Boolean {
-        val destination = (supportFragmentManager.primaryNavigationFragment as? FlowDestinationOwner)
+        return currentFlowDestination()?.showsConnectionLostDialog() == true
+    }
+
+    private fun currentFlowDestination(): FlowDestination? =
+        (supportFragmentManager.primaryNavigationFragment as? FlowDestinationOwner)
             ?.flowDestinationContext
             ?.destination
-        return destination?.showsConnectionLostDialog() == true
-    }
 
     private fun showConnectionLostDialog() {
         if (connectionLostDialog?.isShowing == true || isFinishing || isDestroyed) return
@@ -100,7 +107,9 @@ class CollectionFlowActivity : BaseFlowActivity() {
             .create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                if (!collectionBluetoothProvider.reconnect()) {
+                val restartCollection = currentFlowDestination()
+                    ?.restartsCollectionAfterReconnect() == true
+                if (!collectionBluetoothProvider.reconnect(restartCollection)) {
                     dialog.setMessage("未找到可重新连接的设备，请退出采集后重新选择设备。")
                 }
                 updateConnectionLostDialog(collectionBluetoothProvider.uiState.value)
