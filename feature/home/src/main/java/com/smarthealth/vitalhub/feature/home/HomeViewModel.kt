@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.alibaba.android.arouter.launcher.ARouter
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowSnapshot
+import com.smarthealth.vitalhub.provider.collection.CollectionCheckpoint
+import com.smarthealth.vitalhub.provider.collection.CollectionFlowStep
 import com.smarthealth.vitalhub.provider.user.UserInfo
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,9 +26,12 @@ data class HomeUiState(
     val user: UserInfo? = null,
     val device: DeviceSummary,
     val steps: List<CollectionStep>,
+    val checkpoint: CollectionCheckpoint? = null,
     val progressError: String? = null,
 ) {
     val completedSteps: Int get() = steps.count { it.completed }
+    val primaryActionLabel: String
+        get() = if (user == null) "填写用户信息" else "填写采集前问卷"
 }
 
 class HomeViewModel : ViewModel() {
@@ -35,9 +40,8 @@ class HomeViewModel : ViewModel() {
             device = DeviceSummary("记录仪", connected = false),
             steps = listOf(
                 CollectionStep(1, "采集前问卷", "填写基本信息与症状情况", false, true),
-                CollectionStep(2, "连接记录仪", "通过蓝牙连接记录仪设备", false, false),
-                CollectionStep(3, "开始采集", "选择片段或连续记录模式", false, false),
-                CollectionStep(4, "采集后问卷", "填写工作与热相关症状情况", false, false),
+                CollectionStep(2, "数据采集", "连接记录仪并完成数据采集", false, true),
+                CollectionStep(3, "采集后问卷", "填写工作与热相关症状情况", false, true),
             ),
         ),
     )
@@ -47,17 +51,18 @@ class HomeViewModel : ViewModel() {
         refreshUser()
     }
 
-    fun startSession(): String? = startSessionSnapshot()?.sessionId
-
-    fun startSessionSnapshot(): CollectionFlowSnapshot? = runCatching {
-        requireNotNull(resolveCollectionFlowProvider()).startNewSession()
+    fun sessionForSequentialEntry(): CollectionFlowSnapshot? = runCatching {
+        val provider = requireNotNull(resolveCollectionFlowProvider())
+        provider.getCurrentSession()?.takeUnless { it.checkpoint == CollectionCheckpoint.COMPLETED }
+            ?: provider.startNewSession()
     }.getOrElse {
         reportProgressError()
         null
     }
 
-    fun currentSession(): CollectionFlowSnapshot? = runCatching {
-        resolveCollectionFlowProvider()?.getCurrentSession()
+    fun sessionForDirectEntry(): CollectionFlowSnapshot? = runCatching {
+        val provider = requireNotNull(resolveCollectionFlowProvider())
+        provider.getCurrentSession() ?: provider.startNewSession()
     }.getOrElse {
         reportProgressError()
         null
@@ -77,7 +82,8 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 user = provider?.getUser(),
-                steps = collectionSteps(progress?.completedSteps ?: 0),
+                steps = collectionSteps(progress?.completedStepKeys.orEmpty()),
+                checkpoint = progress?.checkpoint,
                 progressError = null,
             )
         }
@@ -87,10 +93,27 @@ class HomeViewModel : ViewModel() {
         ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
     }.getOrNull()
 
-    private fun collectionSteps(completedSteps: Int): List<CollectionStep> = listOf(
-        CollectionStep(1, "采集前问卷", "填写基本信息与症状情况", completedSteps >= 1, completedSteps == 0),
-        CollectionStep(2, "连接记录仪", "通过蓝牙连接记录仪设备", completedSteps >= 2, completedSteps == 1),
-        CollectionStep(3, "开始采集", "选择片段或连续记录模式", completedSteps >= 3, completedSteps == 2),
-        CollectionStep(4, "采集后问卷", "填写工作与热相关症状情况", completedSteps >= 4, completedSteps == 3),
+    private fun collectionSteps(completedSteps: Set<CollectionFlowStep>): List<CollectionStep> = listOf(
+        CollectionStep(
+            1,
+            "采集前问卷",
+            "填写基本信息与症状情况",
+            CollectionFlowStep.PRE_QUESTIONNAIRE in completedSteps,
+            true,
+        ),
+        CollectionStep(
+            2,
+            "数据采集",
+            "连接记录仪并完成数据采集",
+            CollectionFlowStep.COLLECTION in completedSteps,
+            true,
+        ),
+        CollectionStep(
+            3,
+            "采集后问卷",
+            "填写工作与热相关症状情况",
+            CollectionFlowStep.POST_QUESTIONNAIRE in completedSteps,
+            true,
+        ),
     )
 }

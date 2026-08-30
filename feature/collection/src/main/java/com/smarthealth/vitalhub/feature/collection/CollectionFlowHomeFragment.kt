@@ -7,13 +7,9 @@ import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alibaba.android.arouter.facade.annotation.Route
-import com.alibaba.android.arouter.launcher.ARouter
 import com.smarthealth.vitalhub.core.navi.*
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProvider
-import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
-import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
-import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
 
 @Route(path = Routes.COLLECTION_FLOW_HOME)
 class CollectionFlowHomeFragment : BaseFlowFragment(), AppBarDestination, FlowDestinationOwner {
@@ -53,16 +49,11 @@ class CollectionFlowHomeFragment : BaseFlowFragment(), AppBarDestination, FlowDe
 
     private fun continueDeviceConnection() {
         val sessionId = viewModel.uiState.value.sessionId
-        val transition = dispatchFlowEvent(sessionId)
-        if (transition is CollectionFlowTransition.Applied || transition is CollectionFlowTransition.AlreadyApplied) {
-            Navigator.collection(requireActivity() as FlowNavigationHost, sessionId, requireNotNull(transition.nextDestination))
-        } else {
-            viewModel.reportFlowError()
-        }
+        Navigator.collection(
+            host = requireActivity() as FlowNavigationHost,
+            sessionId = sessionId,
+            destination = FlowDestination.LIVE_PREVIEW,
+            entryMode = arguments?.getString(RouteArgs.FLOW_ENTRY_MODE) ?: FlowEntryMode.SEQUENTIAL,
+        )
     }
-
-    private fun dispatchFlowEvent(sessionId: String): CollectionFlowTransition? = runCatching {
-        ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
-            ?.dispatch(sessionId, CollectionFlowEvent.DeviceConnectionConfirmed)
-    }.getOrNull()
 }

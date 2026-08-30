@@ -10,6 +10,7 @@ import com.smarthealth.vitalhub.core.navi.BottomNavigationKeys
 import com.smarthealth.vitalhub.core.navi.FlowDestination
 import com.smarthealth.vitalhub.core.navi.FlowDestinationContext
 import com.smarthealth.vitalhub.core.navi.FlowDestinationOwner
+import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.Navigator
 import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
@@ -34,22 +35,35 @@ class HomeFragment : BaseFlowFragment(), BottomNavigationDestination, AppBarDest
         val state = viewModel.uiState.collectAsStateWithLifecycle().value
         HomeScreen(
             state = state,
-            onStartQuestionnaire = {
-                viewModel.startSession()?.let { sessionId ->
-                    Navigator.flow(requireContext(), sessionId, FlowDestination.PRE_QUESTIONNAIRE)
+            onPrimaryAction = {
+                if (state.user == null) {
+                    Navigator.editUserInfo(requireContext())
+                } else {
+                    viewModel.sessionForSequentialEntry()?.let { session ->
+                        Navigator.flow(
+                            requireContext(),
+                            session.sessionId,
+                            FlowDestination.PRE_QUESTIONNAIRE,
+                        )
+                    }
                 }
             },
             onEditUserInfo = {
                 Navigator.editUserInfo(requireContext())
             },
             onContinueStep = { stepNumber ->
-                if (stepNumber == 1 && state.user == null) {
-                    Navigator.editUserInfo(requireContext())
-                } else {
-                    val session = viewModel.currentSession() ?: if (stepNumber == 1) viewModel.startSessionSnapshot() else null
-                    session?.nextDestination?.let { destination ->
-                        Navigator.flow(requireContext(), session.sessionId, destination)
+                viewModel.sessionForDirectEntry()?.let { session ->
+                    val destination = when (stepNumber) {
+                        1 -> FlowDestination.PRE_QUESTIONNAIRE
+                        2 -> FlowDestination.DEVICE_CONNECTION
+                        else -> FlowDestination.POST_QUESTIONNAIRE
                     }
+                    Navigator.flow(
+                        requireContext(),
+                        session.sessionId,
+                        destination,
+                        FlowEntryMode.DIRECT_RETURN_HOME,
+                    )
                 }
             },
         )

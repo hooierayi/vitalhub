@@ -23,6 +23,12 @@ object RouteArgs {
     const val QUESTIONNAIRE_PHASE = "questionnairePhase"
     const val COLLECTION_MODE = "collectionMode"
     const val FLOW_DESTINATION = "flowDestination"
+    const val FLOW_ENTRY_MODE = "flowEntryMode"
+}
+
+object FlowEntryMode {
+    const val SEQUENTIAL = "sequential"
+    const val DIRECT_RETURN_HOME = "directReturnHome"
 }
 
 object QuestionnairePhase {

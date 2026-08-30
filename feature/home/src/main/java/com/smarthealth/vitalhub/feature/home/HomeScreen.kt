@@ -24,7 +24,7 @@ import com.smarthealth.vitalhub.provider.user.UserInfo
 @Composable
 fun HomeScreen(
     state: HomeUiState,
-    onStartQuestionnaire: () -> Unit,
+    onPrimaryAction: () -> Unit,
     onEditUserInfo: () -> Unit,
     onContinueStep: (Int) -> Unit,
 ) {
@@ -41,8 +41,8 @@ fun HomeScreen(
         }
         Spacer(Modifier.weight(1f))
         FullWidthButton(
-            label = if (state.user == null) "填写用户信息" else "填写采集前问卷",
-            onClick = if (state.user == null) onEditUserInfo else onStartQuestionnaire,
+            label = state.primaryActionLabel,
+            onClick = onPrimaryAction,
         )
         Spacer(Modifier.height(9.dp))
     }
@@ -133,11 +133,11 @@ private fun ProcessStep(step: CollectionStep, onClick: () -> Unit) {
             Text(step.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary)
             Text(step.subtitle, fontSize = 12.sp, color = VitalColors.TextSecondary)
         }
-        if (step.completed || step.enabled) {
+        if (step.enabled) {
             Text(
-                if (step.completed) "✓" else "›",
+                "›",
                 fontSize = 25.sp,
-                color = if (step.completed) VitalColors.Success else VitalColors.TextMuted,
+                color = VitalColors.TextMuted,
             )
         }
     }

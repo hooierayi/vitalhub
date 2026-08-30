@@ -19,7 +19,7 @@
 | 顶级导航标记 | `BottomNavigationDestination` | 顶级页面实现后，应用壳显示底栏 |
 | 标题栏元数据 | `AppBarDestination` | 页面通过接口声明标题和返回按钮，不重复绘制标题栏 |
 
-当前用户资料编辑 Activity 路由为 `/user/edit`，由 `:feature:user` 的 `UserActivity` 注册；内部 Fragment 路由为 `/user/edit/content`。采集 Activity 路由为 `/collection/flow`，内部采集流程首页和采集 Fragment 分别为 `/collection/flow/home` 与 `/collection/main`。首页四步采集流程由 `CollectionFlowProvider` 的 `/collection/flow/service` 服务读取和更新。
+当前用户资料编辑 Activity 路由为 `/user/edit`，由 `:feature:user` 的 `UserActivity` 注册；内部 Fragment 路由为 `/user/edit/content`。采集 Activity 路由为 `/collection/flow`，内部采集流程首页和采集 Fragment 分别为 `/collection/flow/home` 与 `/collection/main`。首页“采集前问卷、数据采集、采集后问卷”三步流程由 `CollectionFlowProvider` 的 `/collection/flow/service` 服务读取和更新；设备连接属于数据采集内部瞬态，不单独作为持久化检查点。
 
 业务 Activity 内进入二级 Fragment 时，将当前页面隐藏并压入 Fragment 返回栈，而不是通过 `replace` 销毁其 View；返回时恢复原 Fragment、ViewModel 与 Compose 状态，避免采集流程首页重新扫描或丢失已展示设备。
 
@@ -32,7 +32,7 @@
 - 跨模块数据按生命周期选择载体：可持久化、可由 Provider 查询/恢复的业务数据（包括实体、状态标识和可推导的页面模式）必须由目标模块自行通过 Provider 获取，不通过路由参数转发；路由参数仅承载不可恢复的一次性内存导航上下文。
 - 不将 `Activity`、`View`、大对象、不可序列化状态或临时 Lambda 作为路由参数跨模块传递；需要回调时，将回调接口定义在 provider 契约中。
 - 当前 `UserInfoProvider` 以 `/user/service` 注册，调用方通过 `ARouter.navigation(UserInfoProvider::class.java)` 获取；不维护手写注册表或由 `Application` 手动安装实现。
-- 当前 `CollectionFlowProvider` 以 `/collection/flow/service` 注册，由首页和流程模块通过 `ARouter.navigation(CollectionFlowProvider::class.java)` 获取；Provider 只保存流程检查点，设备连接和采集的硬件瞬态在应用恢复时回退为重新连接设备。
+- 当前 `CollectionFlowProvider` 以 `/collection/flow/service` 注册，由首页和流程模块通过 `ARouter.navigation(CollectionFlowProvider::class.java)` 获取；Provider 只保存三项业务流程检查点，不保存设备连接和采集中的硬件瞬态。
 
 ## 3. UI 壳约束
 

@@ -6,6 +6,7 @@ import com.smarthealth.vitalhub.core.storage.KVStorage
 import com.smarthealth.vitalhub.provider.collection.CollectionCheckpoint
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowTransition
+import com.smarthealth.vitalhub.provider.collection.CollectionFlowStep
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import org.junit.Assert.assertEquals
@@ -14,12 +15,11 @@ import org.junit.Test
 
 class CollectionFlowProviderImplTest {
     @Test
-    fun `four checkpoints advance to completed session`() {
+    fun `three checkpoints advance to completed session`() {
         val provider = CollectionFlowProviderImpl(FakeStorage())
         val sessionId = provider.startNewSession().sessionId
 
         assertTransition(provider.dispatch(sessionId, CollectionFlowEvent.PreQuestionnaireSubmitted), FlowDestination.DEVICE_CONNECTION)
-        assertTransition(provider.dispatch(sessionId, CollectionFlowEvent.DeviceConnectionConfirmed), FlowDestination.LIVE_PREVIEW)
         assertTransition(provider.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted), FlowDestination.POST_QUESTIONNAIRE)
         assertTransition(provider.dispatch(sessionId, CollectionFlowEvent.PostQuestionnaireSubmitted), FlowDestination.HOME)
 
@@ -31,7 +31,6 @@ class CollectionFlowProviderImplTest {
         val provider = CollectionFlowProviderImpl(FakeStorage())
         val sessionId = provider.startNewSession().sessionId
         provider.dispatch(sessionId, CollectionFlowEvent.PreQuestionnaireSubmitted)
-        provider.dispatch(sessionId, CollectionFlowEvent.DeviceConnectionConfirmed)
 
         val repeated = provider.dispatch(sessionId, CollectionFlowEvent.PreQuestionnaireSubmitted)
 
@@ -57,15 +56,39 @@ class CollectionFlowProviderImplTest {
     }
 
     @Test
-    fun `interruption drops collection readiness back to device connection`() {
+    fun `interruption keeps durable collection checkpoint`() {
         val provider = CollectionFlowProviderImpl(FakeStorage())
         val sessionId = provider.startNewSession().sessionId
         provider.dispatch(sessionId, CollectionFlowEvent.PreQuestionnaireSubmitted)
-        provider.dispatch(sessionId, CollectionFlowEvent.DeviceConnectionConfirmed)
 
         val recovered = provider.recoverInterruptedSession()
 
-        assertEquals(CollectionCheckpoint.DEVICE_CONNECTION_REQUIRED, recovered?.checkpoint)
+        assertEquals(CollectionCheckpoint.COLLECTION_REQUIRED, recovered?.checkpoint)
+    }
+
+    @Test
+    fun `out of order post questionnaire marks card complete without advancing checkpoint`() {
+        val provider = CollectionFlowProviderImpl(FakeStorage())
+        val sessionId = provider.startNewSession().sessionId
+
+        val transition = provider.dispatch(sessionId, CollectionFlowEvent.PostQuestionnaireSubmitted)
+        val snapshot = provider.getCurrentSession()
+
+        assertTrue(transition is CollectionFlowTransition.Rejected)
+        assertEquals(CollectionCheckpoint.PRE_QUESTIONNAIRE_REQUIRED, snapshot?.checkpoint)
+        assertTrue(CollectionFlowStep.POST_QUESTIONNAIRE in requireNotNull(snapshot).completedStepKeys)
+    }
+
+    @Test
+    fun `schema two device checkpoint migrates to merged collection checkpoint`() {
+        val storage = FakeStorage().apply {
+            putString("session-id", "schema-two-session")
+            putString("checkpoint", "DEVICE_CONNECTION_REQUIRED")
+            putInt("schema-version", 2)
+        }
+        val provider = CollectionFlowProviderImpl(storage)
+
+        assertEquals(CollectionCheckpoint.COLLECTION_REQUIRED, provider.getCurrentSession()?.checkpoint)
     }
 
     @Test
@@ -92,6 +115,10 @@ private class FakeStorage : KVStorage {
     private val values = mutableMapOf<String, Any>()
 
     fun putString(key: String, value: String) {
+        values[key] = value
+    }
+
+    fun putInt(key: String, value: Int) {
         values[key] = value
     }
 

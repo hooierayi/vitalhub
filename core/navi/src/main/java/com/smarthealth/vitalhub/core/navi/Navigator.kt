@@ -21,14 +21,19 @@ object Navigator {
 
     fun editUserInfo(context: Context): FlowNavigationResult = activity(context, Routes.USER_INFO_EDIT)
 
-    fun flow(context: Context, sessionId: String, destination: FlowDestination): FlowNavigationResult = when (destination) {
+    fun flow(
+        context: Context,
+        sessionId: String,
+        destination: FlowDestination,
+        entryMode: String = FlowEntryMode.SEQUENTIAL,
+    ): FlowNavigationResult = when (destination) {
         FlowDestination.HOME -> returnHome(context)
-        FlowDestination.PRE_QUESTIONNAIRE -> questionnaire(context, sessionId, QuestionnairePhase.PRE)
-        FlowDestination.POST_QUESTIONNAIRE -> questionnaire(context, sessionId, QuestionnairePhase.POST)
+        FlowDestination.PRE_QUESTIONNAIRE -> questionnaire(context, sessionId, QuestionnairePhase.PRE, entryMode)
+        FlowDestination.POST_QUESTIONNAIRE -> questionnaire(context, sessionId, QuestionnairePhase.POST, entryMode)
         FlowDestination.DEVICE_CONNECTION,
         FlowDestination.LIVE_PREVIEW,
         FlowDestination.CLIP_COLLECTION,
-        FlowDestination.CONTINUOUS_RECORDING -> collectionFlow(context, sessionId, destination)
+        FlowDestination.CONTINUOUS_RECORDING -> collectionFlow(context, sessionId, destination, entryMode)
     }
 
     fun collection(
@@ -36,17 +41,21 @@ object Navigator {
         sessionId: String,
         destination: FlowDestination,
         addToBackStack: Boolean = true,
+        entryMode: String = FlowEntryMode.SEQUENTIAL,
     ): FlowNavigationResult = when (destination) {
         FlowDestination.DEVICE_CONNECTION -> fragment(
             host,
             Routes.COLLECTION_FLOW_HOME,
-            bundleOf(RouteArgs.SESSION_ID to sessionId),
+            bundleOf(
+                RouteArgs.SESSION_ID to sessionId,
+                RouteArgs.FLOW_ENTRY_MODE to entryMode,
+            ),
             key = "${Routes.COLLECTION_FLOW_HOME}|$sessionId",
             addToBackStack = addToBackStack,
         )
-        FlowDestination.LIVE_PREVIEW -> collectionPage(host, sessionId, CollectionMode.PREVIEW, addToBackStack)
-        FlowDestination.CLIP_COLLECTION -> collectionPage(host, sessionId, CollectionMode.CLIP, addToBackStack)
-        FlowDestination.CONTINUOUS_RECORDING -> collectionPage(host, sessionId, CollectionMode.CONTINUOUS, addToBackStack)
+        FlowDestination.LIVE_PREVIEW -> collectionPage(host, sessionId, CollectionMode.PREVIEW, addToBackStack, entryMode)
+        FlowDestination.CLIP_COLLECTION -> collectionPage(host, sessionId, CollectionMode.CLIP, addToBackStack, entryMode)
+        FlowDestination.CONTINUOUS_RECORDING -> collectionPage(host, sessionId, CollectionMode.CONTINUOUS, addToBackStack, entryMode)
         else -> error("Destination $destination is not owned by CollectionFlowActivity.")
     }
 
@@ -77,22 +86,33 @@ object Navigator {
         )
     }
 
-    private fun questionnaire(context: Context, sessionId: String, phase: String): FlowNavigationResult = activity(
+    private fun questionnaire(
+        context: Context,
+        sessionId: String,
+        phase: String,
+        entryMode: String,
+    ): FlowNavigationResult = activity(
         context,
         Routes.QUESTIONNAIRE,
-        bundleOf(RouteArgs.SESSION_ID to sessionId, RouteArgs.QUESTIONNAIRE_PHASE to phase),
+        bundleOf(
+            RouteArgs.SESSION_ID to sessionId,
+            RouteArgs.QUESTIONNAIRE_PHASE to phase,
+            RouteArgs.FLOW_ENTRY_MODE to entryMode,
+        ),
     )
 
     private fun collectionFlow(
         context: Context,
         sessionId: String,
         destination: FlowDestination,
+        entryMode: String,
     ): FlowNavigationResult = activity(
         context,
         Routes.COLLECTION_FLOW,
         bundleOf(
             RouteArgs.SESSION_ID to sessionId,
             RouteArgs.FLOW_DESTINATION to destination.name,
+            RouteArgs.FLOW_ENTRY_MODE to entryMode,
         ),
     )
 
@@ -101,10 +121,15 @@ object Navigator {
         sessionId: String,
         mode: String,
         addToBackStack: Boolean,
+        entryMode: String,
     ): FlowNavigationResult = fragment(
         host,
         Routes.COLLECTION,
-        bundleOf(RouteArgs.SESSION_ID to sessionId, RouteArgs.COLLECTION_MODE to mode),
+        bundleOf(
+            RouteArgs.SESSION_ID to sessionId,
+            RouteArgs.COLLECTION_MODE to mode,
+            RouteArgs.FLOW_ENTRY_MODE to entryMode,
+        ),
         key = "${Routes.COLLECTION}|$sessionId|$mode",
         addToBackStack = addToBackStack,
     )

@@ -3,38 +3,46 @@ package com.smarthealth.vitalhub.provider.collection
 import com.alibaba.android.arouter.facade.template.IProvider
 import com.smarthealth.vitalhub.core.navi.FlowDestination
 
-/** Durable checkpoint reducer for the four-step collection flow. */
+/** Durable checkpoint reducer for the three-step collection flow. */
 interface CollectionFlowProvider : IProvider {
     fun startNewSession(): CollectionFlowSnapshot
     fun getCurrentSession(): CollectionFlowSnapshot?
     fun dispatch(sessionId: String, event: CollectionFlowEvent): CollectionFlowTransition
 
-    /** Drops hardware-dependent readiness after application or connection interruption. */
+    /** Recovers the durable business checkpoint without restoring transient device state. */
     fun recoverInterruptedSession(): CollectionFlowSnapshot?
 }
 
 data class CollectionFlowSnapshot(
     val sessionId: String,
     val checkpoint: CollectionCheckpoint,
+    val completedStepKeys: Set<CollectionFlowStep> = checkpoint.inferredCompletedSteps,
 ) {
-    val completedSteps: Int get() = checkpoint.completedSteps
+    val completedSteps: Int get() = completedStepKeys.size
     val nextDestination: FlowDestination? get() = checkpoint.nextDestination
 }
 
+enum class CollectionFlowStep(val bit: Int) {
+    PRE_QUESTIONNAIRE(1 shl 0),
+    COLLECTION(1 shl 1),
+    POST_QUESTIONNAIRE(1 shl 2),
+}
+
 enum class CollectionCheckpoint(
-    val completedSteps: Int,
+    val inferredCompletedSteps: Set<CollectionFlowStep>,
     val nextDestination: FlowDestination?,
 ) {
-    PRE_QUESTIONNAIRE_REQUIRED(0, FlowDestination.PRE_QUESTIONNAIRE),
-    DEVICE_CONNECTION_REQUIRED(1, FlowDestination.DEVICE_CONNECTION),
-    COLLECTION_REQUIRED(2, FlowDestination.LIVE_PREVIEW),
-    POST_QUESTIONNAIRE_REQUIRED(3, FlowDestination.POST_QUESTIONNAIRE),
-    COMPLETED(4, null),
+    PRE_QUESTIONNAIRE_REQUIRED(emptySet(), FlowDestination.PRE_QUESTIONNAIRE),
+    COLLECTION_REQUIRED(setOf(CollectionFlowStep.PRE_QUESTIONNAIRE), FlowDestination.DEVICE_CONNECTION),
+    POST_QUESTIONNAIRE_REQUIRED(
+        setOf(CollectionFlowStep.PRE_QUESTIONNAIRE, CollectionFlowStep.COLLECTION),
+        FlowDestination.POST_QUESTIONNAIRE,
+    ),
+    COMPLETED(CollectionFlowStep.entries.toSet(), null),
 }
 
 sealed interface CollectionFlowEvent {
     data object PreQuestionnaireSubmitted : CollectionFlowEvent
-    data object DeviceConnectionConfirmed : CollectionFlowEvent
     data object CollectionCompleted : CollectionFlowEvent
     data object PostQuestionnaireSubmitted : CollectionFlowEvent
 }

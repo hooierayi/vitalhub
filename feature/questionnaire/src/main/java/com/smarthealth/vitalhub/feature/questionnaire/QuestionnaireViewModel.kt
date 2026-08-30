@@ -35,34 +35,53 @@ data class QuestionnaireUiState(
 
 enum class QuestionnaireNext { STAY, DEVICE, ANALYSIS }
 
-class QuestionnaireViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
-    private val isPre = savedStateHandle.get<String>(RouteArgs.QUESTIONNAIRE_PHASE) != QuestionnairePhase.POST
+class QuestionnaireViewModel internal constructor(
+    savedStateHandle: SavedStateHandle,
+    private val answerStore: QuestionnaireAnswerStore,
+) : ViewModel() {
+    constructor(savedStateHandle: SavedStateHandle) : this(
+        savedStateHandle,
+        QuestionnaireAnswerStores.requireStore(),
+    )
+
+    private val phase = savedStateHandle.get<String>(RouteArgs.QUESTIONNAIRE_PHASE) ?: QuestionnairePhase.PRE
+    private val isPre = phase != QuestionnairePhase.POST
+    private val sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty()
+    private val pages = if (isPre) prePages else postPages
+    private val answerCount = if (isPre) 9 else 5
+    private val restoredDraft = answerStore.load(sessionId, phase, answerCount)
     private val _uiState = MutableStateFlow(
         QuestionnaireUiState(
-            sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty(),
+            sessionId = sessionId,
             isPre = isPre,
-            pages = if (isPre) prePages else postPages,
-            pageIndex = 0,
-            answers = List(if (isPre) 9 else 5) { "" },
+            pages = pages,
+            pageIndex = restoredDraft?.pageIndex?.coerceIn(0, pages.lastIndex) ?: 0,
+            answers = restoredDraft?.answers ?: List(answerCount) { "" },
         ),
     )
     val uiState: StateFlow<QuestionnaireUiState> = _uiState.asStateFlow()
 
     fun answer(questionId: Int, answer: String) {
         val state = _uiState.value
-        _uiState.value = state.copy(
+        val updated = state.copy(
             answers = state.answers.toMutableList().also { it[questionId] = answer },
             validationError = false,
         )
+        _uiState.value = updated
+        persist(updated, submitted = false)
     }
 
-    fun reportFlowError() {
-        _uiState.value = _uiState.value.copy(flowError = "采集流程暂不可用，请稍后重试")
+    fun reportFlowError(message: String = "采集流程暂不可用，请稍后重试") {
+        _uiState.value = _uiState.value.copy(flowError = message)
     }
 
     fun previousPage() {
         val state = _uiState.value
-        if (state.pageIndex > 0) _uiState.value = state.copy(pageIndex = state.pageIndex - 1, validationError = false)
+        if (state.pageIndex > 0) {
+            _uiState.value = state.copy(pageIndex = state.pageIndex - 1, validationError = false).also {
+                persist(it, submitted = false)
+            }
+        }
     }
 
     fun nextPage(): QuestionnaireNext {
@@ -72,10 +91,24 @@ class QuestionnaireViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             return QuestionnaireNext.STAY
         }
         if (state.pageIndex < state.pages.lastIndex) {
-            _uiState.value = state.copy(pageIndex = state.pageIndex + 1, validationError = false)
+            _uiState.value = state.copy(pageIndex = state.pageIndex + 1, validationError = false).also {
+                persist(it, submitted = false)
+            }
             return QuestionnaireNext.STAY
         }
         return if (state.isPre) QuestionnaireNext.DEVICE else QuestionnaireNext.ANALYSIS
+    }
+
+    fun markSubmitted(): Boolean = persist(_uiState.value, submitted = true)
+
+    private fun persist(state: QuestionnaireUiState, submitted: Boolean): Boolean = answerStore.save(
+        sessionId = state.sessionId,
+        phase = phase,
+        answers = state.answers,
+        pageIndex = state.pageIndex,
+        submitted = submitted,
+    ).also { saved ->
+        if (!saved) reportFlowError("问卷保存失败，请稍后重试")
     }
 
     private fun isAnswered(question: Question, answer: String): Boolean =

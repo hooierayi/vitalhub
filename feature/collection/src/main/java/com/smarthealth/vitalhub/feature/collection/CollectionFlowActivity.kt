@@ -5,6 +5,7 @@ import com.alibaba.android.arouter.facade.annotation.Route
 import com.smarthealth.vitalhub.core.navi.BaseFlowActivity
 import com.smarthealth.vitalhub.core.navi.CollectionMode
 import com.smarthealth.vitalhub.core.navi.FlowDestination
+import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.core.navi.Routes
 
@@ -26,6 +27,10 @@ class CollectionFlowActivity : BaseFlowActivity() {
 
     override fun initialFragmentArguments(): Bundle = Bundle().apply {
         putString(RouteArgs.SESSION_ID, intent.getStringExtra(RouteArgs.SESSION_ID).orEmpty())
+        putString(
+            RouteArgs.FLOW_ENTRY_MODE,
+            intent.getStringExtra(RouteArgs.FLOW_ENTRY_MODE) ?: FlowEntryMode.SEQUENTIAL,
+        )
         if (initialFragmentPath == Routes.COLLECTION) {
             putString(RouteArgs.COLLECTION_MODE, initialDestination.collectionMode())
         }

@@ -1,5 +1,6 @@
 package com.smarthealth.vitalhub.feature.questionnaire
 
+import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,6 +28,11 @@ class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestina
             sessionId = arguments?.getString(RouteArgs.SESSION_ID),
         )
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        QuestionnaireAnswerStores.initialize(requireContext())
+        super.onCreate(savedInstanceState)
+    }
+
     @Composable
     override fun ScreenContent() {
         val state = viewModel.uiState.collectAsStateWithLifecycle().value
@@ -37,10 +43,14 @@ class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestina
             onNext = {
                 when (viewModel.nextPage()) {
                     QuestionnaireNext.DEVICE -> {
-                        dispatchFlowEvent(state.sessionId, CollectionFlowEvent.PreQuestionnaireSubmitted)
+                        if (viewModel.markSubmitted()) {
+                            dispatchFlowEvent(state.sessionId, CollectionFlowEvent.PreQuestionnaireSubmitted)
+                        }
                     }
                     QuestionnaireNext.ANALYSIS -> {
-                        dispatchFlowEvent(state.sessionId, CollectionFlowEvent.PostQuestionnaireSubmitted)
+                        if (viewModel.markSubmitted()) {
+                            dispatchFlowEvent(state.sessionId, CollectionFlowEvent.PostQuestionnaireSubmitted)
+                        }
                     }
                     QuestionnaireNext.STAY -> Unit
                 }
@@ -52,6 +62,10 @@ class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestina
         val transition = runCatching {
             ARouter.getInstance().navigation(CollectionFlowProvider::class.java)?.dispatch(sessionId, event)
         }.getOrNull()
+        if (arguments?.getString(RouteArgs.FLOW_ENTRY_MODE) == FlowEntryMode.DIRECT_RETURN_HOME) {
+            Navigator.returnHome(requireContext())
+            return
+        }
         when (transition) {
             is CollectionFlowTransition.Applied,
             is CollectionFlowTransition.AlreadyApplied -> Navigator.flow(

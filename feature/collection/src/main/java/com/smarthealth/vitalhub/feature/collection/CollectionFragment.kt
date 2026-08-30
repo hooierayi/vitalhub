@@ -46,6 +46,9 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             sessionId = arguments?.getString(RouteArgs.SESSION_ID),
         )
 
+    private val flowEntryMode: String
+        get() = arguments?.getString(RouteArgs.FLOW_ENTRY_MODE) ?: FlowEntryMode.SEQUENTIAL
+
     @Composable
     override fun ScreenContent() {
         val bluetoothState = collectionBluetoothProvider.uiState.collectAsStateWithLifecycle().value
@@ -117,7 +120,12 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             val target = File(directory, "$sessionId-${System.currentTimeMillis()}.vhf")
             runCatching { collectionBluetoothProvider.startRecording(target.absolutePath) }
                 .onSuccess {
-                    Navigator.collection(host, sessionId, FlowDestination.CLIP_COLLECTION)
+                    Navigator.collection(
+                        host,
+                        sessionId,
+                        FlowDestination.CLIP_COLLECTION,
+                        entryMode = flowEntryMode,
+                    )
                 }
                 .onFailure { viewModel.reportDeviceError(it.message ?: "无法创建采集文件") }
         }
@@ -151,6 +159,7 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
                     host,
                     sessionId,
                     FlowDestination.CONTINUOUS_RECORDING,
+                    entryMode = flowEntryMode,
                 )
                 is CommandResult.Rejected -> viewModel.reportDeviceError(
                     "设备拒绝连续记录，状态码=${result.status}",
@@ -183,6 +192,10 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
                 ?.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
         }.getOrNull()
+        if (flowEntryMode == FlowEntryMode.DIRECT_RETURN_HOME) {
+            Navigator.returnHome(requireContext())
+            return
+        }
         when (transition) {
             is CollectionFlowTransition.Applied,
             is CollectionFlowTransition.AlreadyApplied -> Navigator.flow(
