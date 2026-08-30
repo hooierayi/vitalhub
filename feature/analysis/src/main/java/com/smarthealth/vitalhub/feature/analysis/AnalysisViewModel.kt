@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alibaba.android.arouter.launcher.ARouter
+import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
@@ -37,6 +38,7 @@ enum class AnalysisProcessStage {
 
 data class AnalysisUiState(
     val sessionId: String,
+    val flowEntryMode: String,
     val processStage: AnalysisProcessStage = AnalysisProcessStage.UPLOADING,
     val uploadProgress: Int = 0,
     val processError: String? = null,
@@ -57,6 +59,8 @@ class AnalysisViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     private val deviceProvider = resolveProvider<DeviceProvider>()
     private val userInfoProvider = resolveProvider<UserInfoProvider>()
     private val sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty()
+    private val flowEntryMode = savedStateHandle.get<String>(RouteArgs.FLOW_ENTRY_MODE)
+        ?: FlowEntryMode.SEQUENTIAL
     private val collectionCompletedAt = runCatching {
         collectionFlowProvider?.getCurrentSession()
             ?.takeIf { snapshot -> snapshot.sessionId == sessionId }
@@ -67,6 +71,7 @@ class AnalysisViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     private val _uiState = MutableStateFlow(
         AnalysisUiState(
             sessionId = sessionId,
+            flowEntryMode = flowEntryMode,
             collectionCompletedAt = collectionCompletedAt?.let(::formatCollectionTime) ?: "-",
             deviceName = resolveDeviceName(deviceProvider),
             collectorName = runCatching { userInfoProvider?.getUser()?.name }

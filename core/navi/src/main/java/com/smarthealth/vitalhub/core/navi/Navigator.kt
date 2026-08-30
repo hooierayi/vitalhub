@@ -84,11 +84,15 @@ object Navigator {
     fun analysis(
         context: Context,
         sessionId: String,
+        entryMode: String = FlowEntryMode.SEQUENTIAL,
         finishSourceOnArrival: Boolean = false,
     ): FlowNavigationResult = activity(
         context,
         Routes.ANALYSIS,
-        bundleOf(RouteArgs.SESSION_ID to sessionId),
+        bundleOf(
+            RouteArgs.SESSION_ID to sessionId,
+            RouteArgs.FLOW_ENTRY_MODE to entryMode,
+        ),
         finishSourceOnArrival,
     )
 

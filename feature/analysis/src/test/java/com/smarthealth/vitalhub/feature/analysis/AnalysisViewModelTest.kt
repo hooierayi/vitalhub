@@ -1,6 +1,8 @@
 package com.smarthealth.vitalhub.feature.analysis
 
 import androidx.lifecycle.SavedStateHandle
+import com.smarthealth.vitalhub.core.navi.FlowEntryMode
+import com.smarthealth.vitalhub.core.navi.RouteArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -46,5 +48,19 @@ class AnalysisViewModelTest {
         advanceUntilIdle()
         assertEquals(AnalysisProcessStage.COMPLETED, viewModel.uiState.value.processStage)
         assertEquals(100, viewModel.uiState.value.uploadProgress)
+    }
+
+    @Test
+    fun `direct collection entry remains direct through analysis`() = runTest(dispatcher) {
+        val viewModel = AnalysisViewModel(
+            SavedStateHandle(
+                mapOf(
+                    RouteArgs.SESSION_ID to "session",
+                    RouteArgs.FLOW_ENTRY_MODE to FlowEntryMode.DIRECT_RETURN_HOME,
+                ),
+            ),
+        )
+
+        assertEquals(FlowEntryMode.DIRECT_RETURN_HOME, viewModel.uiState.value.flowEntryMode)
     }
 }

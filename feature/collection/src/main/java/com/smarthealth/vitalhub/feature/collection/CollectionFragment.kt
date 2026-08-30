@@ -277,6 +277,7 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             Navigator.analysis(
                 context = requireContext(),
                 sessionId = sessionId,
+                entryMode = flowEntryMode,
                 finishSourceOnArrival = true,
             )
 

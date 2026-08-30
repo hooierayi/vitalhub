@@ -50,6 +50,7 @@ class AnalysisFragment : BaseFlowFragment(), AppBarDestination {
                         context = requireContext(),
                         sessionId = state.sessionId,
                         destination = FlowDestination.POST_QUESTIONNAIRE,
+                        entryMode = state.flowEntryMode,
                     )
                 }
             },
