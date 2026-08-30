@@ -81,10 +81,15 @@ object Navigator {
         else -> error("Destination $destination is not owned by CollectionFlowActivity.")
     }
 
-    fun analysis(context: Context, sessionId: String): FlowNavigationResult = activity(
+    fun analysis(
+        context: Context,
+        sessionId: String,
+        finishSourceOnArrival: Boolean = false,
+    ): FlowNavigationResult = activity(
         context,
         Routes.ANALYSIS,
         bundleOf(RouteArgs.SESSION_ID to sessionId),
+        finishSourceOnArrival,
     )
 
     fun fragment(

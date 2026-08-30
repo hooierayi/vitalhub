@@ -1,16 +1,19 @@
 package com.smarthealth.vitalhub.feature.collection
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,10 +46,20 @@ fun CollectionScreen(
     onStartClip: () -> Unit,
     onStartContinuous: () -> Unit,
     onStopClip: () -> Unit,
+    onRestartClip: () -> Unit,
     onFinishContinuous: () -> Unit,
 ) {
     when (state.mode) {
-        CollectionMode.CLIP -> ClipPage(state, ecgWaveformState, respirationWaveformState, onStopClip)
+        CollectionMode.CLIP -> ClipPage(
+            state = state,
+            device = device,
+            isDeviceConnected = isDeviceConnected,
+            ecgWaveformState = ecgWaveformState,
+            respirationWaveformState = respirationWaveformState,
+            latestFrame = latestFrame,
+            onStop = onStopClip,
+            onRestart = onRestartClip,
+        )
         CollectionMode.CONTINUOUS -> ContinuousPage(state, device, onStartClip, onFinishContinuous)
         else -> PreviewPage(
             state,
@@ -78,70 +91,12 @@ private fun PreviewPage(
             Text(it, Modifier.padding(top = 6.dp), color = VitalColors.Danger, fontSize = 12.sp)
         }
         Spacer(Modifier.height(10.dp))
-        Row(
+        LiveDataDashboard(
+            ecgWaveformState = ecgWaveformState,
+            respirationWaveformState = respirationWaveformState,
+            latestFrame = latestFrame,
             modifier = Modifier.fillMaxWidth().weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Column(
-                modifier = Modifier.weight(1.95f).fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                WaveformPanel(
-                    title = "ECG",
-                    trailing = waveformScaleLabel(ECG_PAPER_SPEED, ECG_GAIN),
-                    status = when (latestFrame?.leadOff) {
-                        false -> "导联正常"
-                        true -> "导联脱落"
-                        null -> "导联--"
-                    },
-                    statusColor = when (latestFrame?.leadOff) {
-                        false -> VitalColors.Success
-                        true -> VitalColors.Danger
-                        null -> VitalColors.TextMuted
-                    },
-                    modifier = Modifier.weight(1.25f),
-                ) {
-                    EcgWaveform(
-                        state = ecgWaveformState,
-                        modifier = Modifier.fillMaxSize(),
-                        paperSpeed = ECG_PAPER_SPEED,
-                        gain = ECG_GAIN,
-                    )
-                }
-                WaveformPanel(
-                    title = "RESP",
-                    trailing = "阻抗",
-                    modifier = Modifier.weight(1f),
-                ) {
-                    RespirationWaveform(
-                        state = respirationWaveformState,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SixAxisPanel(
-                    sample = latestFrame?.motion?.lastOrNull(),
-                    modifier = Modifier.weight(1.25f),
-                )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    EnvironmentPanel(
-                        frame = latestFrame,
-                        modifier = Modifier.weight(1f),
-                    )
-                    BodyPanel(
-                        frame = latestFrame,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
+        )
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             FlowButton("采集上传", FlowButtonStyle.OUTLINE, Modifier.weight(1f), onStartClip)
@@ -152,12 +107,85 @@ private fun PreviewPage(
 }
 
 @Composable
+private fun LiveDataDashboard(
+    ecgWaveformState: RealtimeWaveformState,
+    respirationWaveformState: RealtimeWaveformState,
+    latestFrame: RecorderFrame?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(
+            modifier = Modifier.weight(1.95f).fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            WaveformPanel(
+                title = "ECG",
+                trailing = waveformScaleLabel(ECG_PAPER_SPEED, ECG_GAIN),
+                status = when (latestFrame?.leadOff) {
+                    false -> "导联正常"
+                    true -> "导联脱落"
+                    null -> "导联--"
+                },
+                statusColor = when (latestFrame?.leadOff) {
+                    false -> VitalColors.Success
+                    true -> VitalColors.Danger
+                    null -> VitalColors.TextMuted
+                },
+                modifier = Modifier.weight(1.25f),
+            ) {
+                EcgWaveform(
+                    state = ecgWaveformState,
+                    modifier = Modifier.fillMaxSize(),
+                    paperSpeed = ECG_PAPER_SPEED,
+                    gain = ECG_GAIN,
+                )
+            }
+            WaveformPanel(
+                title = "RESP",
+                trailing = "阻抗",
+                modifier = Modifier.weight(1f),
+            ) {
+                RespirationWaveform(
+                    state = respirationWaveformState,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SixAxisPanel(
+                sample = latestFrame?.motion?.lastOrNull(),
+                modifier = Modifier.weight(1.25f),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                EnvironmentPanel(
+                    frame = latestFrame,
+                    modifier = Modifier.weight(1f),
+                )
+                BodyPanel(
+                    frame = latestFrame,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun WaveformPanel(
     title: String,
+    modifier: Modifier = Modifier,
     trailing: String? = null,
     status: String? = null,
     statusColor: Color = VitalColors.TextMuted,
-    modifier: Modifier = Modifier,
     waveform: @Composable () -> Unit,
 ) {
     PreviewCard(modifier) {
@@ -317,44 +345,115 @@ private fun SweatLevel.displayName(): String = when (this) {
 @Composable
 private fun ClipPage(
     state: CollectionUiState,
+    device: BluetoothKitDevice?,
+    isDeviceConnected: Boolean,
     ecgWaveformState: RealtimeWaveformState,
     respirationWaveformState: RealtimeWaveformState,
+    latestFrame: RecorderFrame?,
     onStop: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     FlowPage(scrollable = false) {
-        Text("正在采集 2 分钟片段", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary)
-        state.flowError?.let { Text(it, color = VitalColors.Danger, fontSize = 14.sp) }
-        Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(state.clipProgress, Modifier.size(121.dp), color = VitalColors.Teal, trackColor = Color(0xFFECEFF2), strokeWidth = 9.dp)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(state.clipElapsed, fontSize = 29.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary); Text("02:00", fontSize = 13.sp, color = VitalColors.TextSecondary) }
+        ClipSummaryCard(state)
+        state.flowError?.let {
+            Text(it, Modifier.padding(top = 6.dp), color = VitalColors.Danger, fontSize = 12.sp)
         }
-        WaveformHeader("ECG", waveformScaleLabel(ECG_PAPER_SPEED, ECG_GAIN))
-        EcgWaveform(
-            state = ecgWaveformState,
-            modifier = Modifier.fillMaxWidth().height(67.dp),
-            paperSpeed = ECG_PAPER_SPEED,
-            gain = ECG_GAIN,
-            showCalibrationPulse = false,
+        Spacer(Modifier.height(8.dp))
+        ConnectedBanner(device, isDeviceConnected)
+        Spacer(Modifier.height(8.dp))
+        LiveDataDashboard(
+            ecgWaveformState = ecgWaveformState,
+            respirationWaveformState = respirationWaveformState,
+            latestFrame = latestFrame,
+            modifier = Modifier.fillMaxWidth().weight(1f),
         )
-        WaveformHeader("RESP", "250 Hz · 自动幅度")
-        RespirationWaveform(
-            state = respirationWaveformState,
-            modifier = Modifier.fillMaxWidth().height(67.dp),
-        )
-        Spacer(Modifier.height(14.dp))
-        InfoCard(padding = PaddingValues(14.dp), spacing = 12.dp) { StatusLine(true, "本地缓存中", "已缓存 ${state.clipElapsed}"); StatusLine(false, "分块上传中", "2 / 4 块") }
-        Spacer(Modifier.weight(1f)); FullWidthButton("停止采集", FlowButtonStyle.DANGER, onStop); Spacer(Modifier.height(9.dp))
+        Spacer(Modifier.height(12.dp))
+        if (state.isClipCollecting) {
+            FullWidthButton("停止采集", FlowButtonStyle.DANGER, onStop)
+        } else {
+            FullWidthButton("开始采集", FlowButtonStyle.PRIMARY, onRestart)
+        }
+        Spacer(Modifier.height(9.dp))
     }
 }
 
 @Composable
-private fun WaveformHeader(title: String, trailing: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+private fun ClipSummaryCard(state: CollectionUiState) {
+    val durationClock = formatClipClock(state.clipDurationSeconds)
+    val durationLabel = formatClipDurationLabel(state.clipDurationSeconds)
+    val animatedProgress by animateFloatAsState(
+        targetValue = state.clipProgress,
+        animationSpec = tween(durationMillis = 120, easing = LinearEasing),
+        label = "clip-progress",
+    )
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(104.dp)
+            .background(VitalColors.TealPale, RoundedCornerShape(10.dp))
+            .border(1.dp, VitalColors.Border, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary)
-        Text(trailing, fontSize = 12.sp, color = VitalColors.TextSecondary)
+        val compact = maxWidth < 350.dp
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(if (compact) 68.dp else 78.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    progress = animatedProgress,
+                    modifier = Modifier.fillMaxSize(),
+                    color = VitalColors.Teal,
+                    trackColor = Color(0xFFE3E9EB),
+                    strokeWidth = 7.dp,
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        state.clipElapsed,
+                        fontSize = when {
+                            durationClock.length > 5 -> 14.sp
+                            compact -> 17.sp
+                            else -> 20.sp
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                        color = VitalColors.TextPrimary,
+                    )
+                    Text(durationClock, fontSize = 10.sp, color = VitalColors.TextSecondary)
+                }
+            }
+            Column(
+                modifier = Modifier.padding(start = 12.dp).weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    if (state.isClipCollecting) "正在采集 $durationLabel 片段" else "采集已停止",
+                    fontSize = if (compact) 12.sp else 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = VitalColors.TextPrimary,
+                    maxLines = 1,
+                )
+                Text("剩余时间", fontSize = 11.sp, color = VitalColors.TextSecondary)
+                Text(
+                    "倒计时结束自动进入上传页面",
+                    fontSize = 10.sp,
+                    color = VitalColors.Teal,
+                    maxLines = 1,
+                )
+            }
+            Text(
+                state.clipRemaining,
+                fontSize = when {
+                    durationClock.length > 5 -> 23.sp
+                    compact -> 27.sp
+                    else -> 31.sp
+                },
+                fontWeight = FontWeight.SemiBold,
+                color = VitalColors.Teal,
+            )
+        }
     }
 }
 
@@ -373,7 +472,7 @@ private fun ContinuousPage(state: CollectionUiState, device: BluetoothKitDevice?
         }
         Row(Modifier.fillMaxWidth().padding(top = 15.dp).background(Color(0xFFF4F7FB), RoundedCornerShape(9.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Info, null, tint = VitalColors.Blue, modifier = Modifier.size(23.dp)); Text("APP断开后设备仍会继续记录", Modifier.padding(start = 9.dp), fontSize = 14.sp, color = VitalColors.TextPrimary) }
         Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) { FlowButton("采集 2 分钟片段", FlowButtonStyle.OUTLINE, Modifier.weight(1f), onClip); FlowButton("结束连续记录", FlowButtonStyle.DANGER, Modifier.weight(1f), onFinish) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) { FlowButton("采集 ${formatClipDurationLabel(state.clipDurationSeconds)}片段", FlowButtonStyle.OUTLINE, Modifier.weight(1f), onClip); FlowButton("结束连续记录", FlowButtonStyle.DANGER, Modifier.weight(1f), onFinish) }
         Spacer(Modifier.height(9.dp))
     }
 }
@@ -417,7 +516,5 @@ private fun ConnectedBanner(device: BluetoothKitDevice?, isConnected: Boolean) {
         )
     }
 }
-@Composable private fun StatusLine(done: Boolean, label: String, value: String) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { if (done) Icon(Icons.Default.CheckCircle, null, tint = VitalColors.Teal, modifier = Modifier.size(22.dp)) else CircularProgressIndicator(.7f, Modifier.size(22.dp), color = VitalColors.Teal, strokeWidth = 2.dp, trackColor = Color(0xFFE2E8EC)); Text(label, Modifier.padding(start = 10.dp).weight(1f), fontSize = 14.sp, color = VitalColors.TextPrimary); Text(value, fontSize = 13.sp, color = VitalColors.TextSecondary) } }
-
 private val ECG_PAPER_SPEED = PaperSpeed.MM_25_PER_SECOND
 private val ECG_GAIN = PaperGain.MM_10_PER_MV

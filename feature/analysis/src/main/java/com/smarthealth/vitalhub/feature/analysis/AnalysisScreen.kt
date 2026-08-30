@@ -24,13 +24,53 @@ import kotlin.math.sin
 @Composable
 fun AnalysisScreen(state: AnalysisUiState, onDetails: () -> Unit) {
     FlowPage(scrollable = false) {
-        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.CheckCircle, null, tint = VitalColors.Success, modifier = Modifier.size(24.dp)); Text(if (state.completed) "分析完成" else "分析中", Modifier.padding(start = 9.dp), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary) }
+        UploadAndAnalysisCard(state)
         SuccessBanner(state.conclusion, state.suggestion)
         SectionTitle("关键指标趋势", top = 14.dp)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { state.metrics.forEach { TrendCard(it) } }
         SectionTitle("本次记录信息", top = 16.dp)
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { KeyValueRow("记录编号", state.recordId); KeyValueRow("记录时长", state.duration); KeyValueRow("记录时间", state.recordedAt); KeyValueRow("设备型号", state.deviceModel) }
         Spacer(Modifier.weight(1f)); FullWidthButton("查看详情", FlowButtonStyle.BLUE, onDetails); Spacer(Modifier.height(9.dp))
+    }
+}
+
+@Composable
+private fun UploadAndAnalysisCard(state: AnalysisUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF1F9F6), RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = if (state.completed) VitalColors.Success else VitalColors.Teal,
+                modifier = Modifier.size(24.dp),
+            )
+            Column(Modifier.padding(start = 10.dp).weight(1f)) {
+                Text(
+                    if (state.completed) "上传与分析完成" else "数据上传与分析中",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VitalColors.TextPrimary,
+                )
+                Text(
+                    "采集编号 ${state.sessionId.ifBlank { "-" }}",
+                    fontSize = 12.sp,
+                    color = VitalColors.TextSecondary,
+                )
+            }
+            Text(
+                if (state.completed) "100%" else "处理中",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = VitalColors.Teal,
+            )
+        }
+        ProgressTrack(progress = if (state.completed) 1f else 0.45f, color = VitalColors.Teal)
     }
 }
 

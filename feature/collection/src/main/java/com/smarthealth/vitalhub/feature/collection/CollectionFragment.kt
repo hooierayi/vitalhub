@@ -79,6 +79,12 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             .value
         val displayedDevice = connectedDevice ?: bluetoothState.lastConnectedDevice
         val host = requireActivity() as FlowNavigationHost
+        LaunchedEffect(state.clipCountdownFinished) {
+            if (state.clipCountdownFinished) {
+                viewModel.consumeClipCountdownFinished()
+                completeClipAndOpenAnalysis(state.sessionId)
+            }
+        }
         val displayState = state.copy(
             metrics = deviceMetrics?.let { metrics ->
                 listOf(
@@ -108,7 +114,8 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             onStartContinuous = {
                 startContinuous(host, state.sessionId)
             },
-            onStopClip = { stopCollection(state.sessionId) },
+            onStopClip = { pauseClipCollection() },
+            onRestartClip = { restartClipRecording(state.sessionId) },
             onFinishContinuous = { stopCollection(state.sessionId) },
         )
     }
@@ -184,6 +191,50 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
                     result.cause.message ?: "停止采集指令失败",
                 )
             }
+        }
+    }
+
+    private fun pauseClipCollection() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatching { collectionBluetoothProvider.stopRecording() }
+                .onSuccess { viewModel.stopClipTimer() }
+                .onFailure {
+                    viewModel.stopClipTimer()
+                    viewModel.reportDeviceError(it.message ?: "停止本地记录失败")
+                }
+        }
+    }
+
+    private fun restartClipRecording(sessionId: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val directory = requireContext().getExternalFilesDir("records")
+                ?: File(requireContext().filesDir, "records")
+            val target = File(directory, "$sessionId-${System.currentTimeMillis()}.vhf")
+            runCatching { collectionBluetoothProvider.startRecording(target.absolutePath) }
+                .onSuccess { viewModel.restartClipTimer() }
+                .onFailure {
+                    viewModel.reportDeviceError(it.message ?: "无法创建采集文件")
+                }
+        }
+    }
+
+    private fun completeClipAndOpenAnalysis(sessionId: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatching { collectionBluetoothProvider.stopRecording() }
+                .onFailure { viewModel.reportDeviceError(it.message ?: "停止本地记录失败") }
+            runCatching {
+                ARouter.getInstance().navigation(CollectionFlowProvider::class.java)
+                    ?.dispatch(sessionId, CollectionFlowEvent.CollectionCompleted)
+            }
+            Navigator.analysis(
+                context = requireContext(),
+                sessionId = sessionId,
+                finishSourceOnArrival = true,
+            )
+
+            // The upload-page transition must not wait for a device receipt. Stop the device
+            // only as best-effort cleanup after navigation has already been requested.
+            runCatching { collectionBluetoothProvider.execute(DeviceCommand.StopCollection) }
         }
     }
 
