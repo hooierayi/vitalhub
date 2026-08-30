@@ -103,9 +103,15 @@ class ProtocolStreamEngine(
                 }
                 is DecodeDecision.Emit -> {
                     require(decision.consumedBytes in 1..buffer.size)
+                    val packetBytes = buffer.copy(0, decision.consumedBytes)
                     buffer.skip(decision.consumedBytes)
                     packets += decision.packet
                     trace.log("PROTOCOL", "emit=${decision.packet.summary()}, consumed=${decision.consumedBytes}, remaining=${buffer.size}")
+                    trace.log(
+                        "PROTOCOL_DATA_RAW",
+                        "decoded ${packetBytes.size} bytes",
+                        packetBytes,
+                    )
                 }
                 is DecodeDecision.Recover -> {
                     val skip = decision.skipBytes.coerceIn(1, buffer.size)

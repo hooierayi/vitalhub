@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".ProtocolDebugActivity"
+            android:exported="false"
+            android:label="协议交互" />
+    </application>
+</manifest>

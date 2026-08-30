@@ -16,6 +16,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.ybq") }
+        }
     }
 }
 
@@ -42,3 +45,6 @@ include(":feature:user")
 include(":feature:questionnaire")
 include(":feature:collection")
 include(":feature:analysis")
+include(":debug:dokit-bluetooth")
+include(":debug:dokit-protocol")
+include(":debug:dokit-waveform")

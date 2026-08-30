@@ -6,6 +6,7 @@ import android.util.Log
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothGattDevice
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKit
 import com.smarthealth.vitalhub.foundation.device.api.DeviceSdk
+import com.smarthealth.vitalhub.foundation.device.api.DeviceDebugTrace
 import com.smarthealth.vitalhub.foundation.device.api.DeviceTrace
 import com.smarthealth.vitalhub.foundation.device.command.RecorderCommandEncoder
 import com.smarthealth.vitalhub.foundation.device.command.RecorderCommandRegistry
@@ -75,10 +76,17 @@ object RecorderDeviceSdk {
         protocolConfig: RecorderDeviceProtocolConfig,
         profileResolver: BluetoothDeviceProfileResolver,
     ): DeviceSdk {
-        val trace = if (protocolConfig.dataChainTraceEnabled) {
-            DeviceTrace { stage, message -> Log.d(DATA_CHAIN_TAG, "[$stage] $message") }
-        } else {
-            DeviceTrace.NONE
+        val trace = object : DeviceTrace {
+            override fun log(stage: String, message: String) {
+                log(stage, message, null)
+            }
+
+            override fun log(stage: String, message: String, payload: ByteArray?) {
+                DeviceDebugTrace.record(stage, message, payload)
+                if (protocolConfig.dataChainTraceEnabled) {
+                    Log.d(DATA_CHAIN_TAG, "[$stage] $message")
+                }
+            }
         }
         val resolver = BluetoothGattDeviceResolver { address ->
             val bluetoothDevice = BluetoothKit.getInstance().bluetoothAdapter.getRemoteDevice(address)

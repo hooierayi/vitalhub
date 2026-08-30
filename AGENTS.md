@@ -132,3 +132,6 @@
 | `:feature:questionnaire` | 采集前后问卷 | 业务 feature | 根 `AGENTS.md` |
 | `:feature:collection` | BLE 权限、扫描、连接、实时预览、片段、连续记录与采集进度 Provider 实现 | 业务 feature | 根 `AGENTS.md` |
 | `:feature:analysis` | 异步分析任务及结果 | 业务 feature | 根 `AGENTS.md` |
+| `:debug:dokit-bluetooth` | DoKit 蓝牙连接与原始收发数据面板，仅由 app debug 变体打包 | Debug 工具层 | 根 `AGENTS.md` |
+| `:debug:dokit-protocol` | DoKit 协议拆包、恢复、指令与回执面板，仅由 app debug 变体打包 | Debug 工具层 | 根 `AGENTS.md` |
+| `:debug:dokit-waveform` | DoKit ECG/呼吸环形缓冲状态面板，仅由 app debug 变体打包 | Debug 工具层 | 根 `AGENTS.md` |

@@ -67,6 +67,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    debugImplementation(project(":debug:dokit-bluetooth"))
+    debugImplementation(project(":debug:dokit-protocol"))
+    debugImplementation(project(":debug:dokit-waveform"))
+    debugImplementation(libs.dokitx) {
+        exclude(group = "com.android.volley", module = "volley")
+    }
+    debugImplementation(libs.volley)
     kapt(libs.arouter.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

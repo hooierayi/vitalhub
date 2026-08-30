@@ -31,6 +31,14 @@ out/
 release/
 debug/
 
+# Debug-only source sets and checked-in device tooling modules.
+!app/src/debug/
+!app/src/debug/**
+!app/src/release/
+!app/src/release/**
+!debug/
+!debug/**
+
 # Gradle files
 .gradle/
 build/

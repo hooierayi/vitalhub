@@ -4,6 +4,10 @@ package com.smarthealth.vitalhub.foundation.device.api
 fun interface DeviceTrace {
     fun log(stage: String, message: String)
 
+    fun log(stage: String, message: String, payload: ByteArray?) {
+        log(stage, message)
+    }
+
     companion object {
         val NONE = DeviceTrace { _, _ -> }
     }

@@ -48,6 +48,7 @@ class VitalHubApplication : Application() {
                 routePermissions = mapOf(Routes.COLLECTION_FLOW to DEVICE_BLUETOOTH_PERMISSION),
             ),
         )
+        DebugToolsInitializer.init(this)
     }
 
     private companion object {

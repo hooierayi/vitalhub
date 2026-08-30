@@ -7,6 +7,7 @@ import com.smarthealth.vitalhub.foundation.bluetooth.callback.BluetoothGattIndic
 import com.smarthealth.vitalhub.foundation.bluetooth.callback.BluetoothGattNotifyCallback
 import com.smarthealth.vitalhub.foundation.bluetooth.callback.BluetoothWriteCallback
 import com.smarthealth.vitalhub.foundation.device.api.DeviceTrace
+import com.smarthealth.vitalhub.foundation.device.api.DeviceDebugTrace
 import com.smarthealth.vitalhub.foundation.device.api.traceHex
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -82,6 +83,7 @@ class BluetoothGattDeviceTransport(
             }
             fun emit(payload: ByteArray) {
                 trace.log("BLE_RX", "bytes=${payload.size}, hex=${payload.traceHex()}")
+                DeviceDebugTrace.record("BLE_RX_RAW", "received ${payload.size} bytes", payload)
                 incomingChannel.trySend(payload.copyOf())
             }
             fun enableDataChannel() {
@@ -146,6 +148,7 @@ class BluetoothGattDeviceTransport(
         val profile = checkNotNull(activeProfile) { "Bluetooth profile is not resolved" }
         check(state.value == TransportState.CONNECTED) { "Transport is not connected" }
         trace.log("BLE_TX", "bytes=${bytes.size}, header=${bytes.traceHex(4)}")
+        DeviceDebugTrace.record("BLE_TX_RAW", "sent ${bytes.size} bytes", bytes)
         suspendCancellableCoroutine { continuation ->
             val completed = AtomicBoolean(false)
             target.write(

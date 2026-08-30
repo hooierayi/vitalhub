@@ -27,7 +27,7 @@
 ### 构建变体
 
 - flavor 维度：未配置。
-- buildType：默认 `debug`、`release`；`release` 当前不启用代码压缩。
+- buildType：默认 `debug`、`release`；`release` 当前不启用代码压缩。DoKit 及三个设备调试面板仅通过 `debugImplementation` 打包，release 使用空初始化实现。
 - 默认验证 variant：`debug`。
 
 ## 2. 模块依赖关系
@@ -55,6 +55,12 @@ graph TD
     app --> questionnaire[":feature:questionnaire"]
     app --> collection[":feature:collection"]
     app --> analysis[":feature:analysis"]
+    app -. debug only .-> dokitBluetooth[":debug:dokit-bluetooth"]
+    app -. debug only .-> dokitProtocol[":debug:dokit-protocol"]
+    app -. debug only .-> dokitWaveform[":debug:dokit-waveform"]
+    dokitBluetooth --> deviceApi
+    dokitProtocol --> deviceApi
+    dokitWaveform --> waveformUi
     home --> common
     home --> navi
     home --> userProvider
@@ -102,6 +108,9 @@ graph TD
 | `:feature:questionnaire` | Android library | common、navi、provider:collection | app | 前后问卷 Activity 与内部 Fragment |
 | `:feature:collection` | Android library | common、device-waveform-ui、navi、storage、foundation:bluetooth、device-api、device-sdk、provider:collection、provider:device | app | BLE 设备、采集 Activity、内部 Fragment、记录与流程状态机实现 |
 | `:feature:analysis` | Android library | common、navi | app | 分析 Activity 与内部 Fragment |
+| `:debug:dokit-bluetooth` | Android library（debug only） | device-api、DoKit | app debug | 蓝牙连接、完整原始 RX/TX 数据调试面板 |
+| `:debug:dokit-protocol` | Android library（debug only） | device-api、DoKit | app debug | 协议缓冲、拆包恢复、指令及回执调试面板 |
+| `:debug:dokit-waveform` | Android library（debug only） | device-waveform-ui、DoKit | app debug | ECG/呼吸环形缓冲容量、游标、覆盖和采样范围调试面板 |
 
 ## 3. 工程分层
 
@@ -118,6 +127,7 @@ graph TD
 - `:provider:collection` 是继承 `IProvider` 的采集流程状态机契约层；`:feature:collection` 负责 MMKV 实现及 `/collection/flow/service` 服务注册。
 - `:provider:device` 是继承 `IProvider` 的最近连接设备契约层；`:feature:collection` 负责兼容既有存储的 MMKV 实现及 `/device/service` 服务注册。
 - feature 模块不直接依赖彼此，使用 ARouter 路径经 `Navigator` 跳转。
+- 三个 `:debug:dokit-*` 模块只消费 foundation 暴露的惰性调试快照，不被业务模块依赖；工具以宿主 Activity 内可拖动的数据卡片展示并保留完整详情页，不申请系统悬浮窗权限。DoKit SDK 只存在于 app debug 运行时，release 不打包悬浮卡片或面板 Activity。
 
 ## 4. 跨模块影响面判断
 

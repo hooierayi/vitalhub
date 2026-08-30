@@ -11,6 +11,7 @@ import kotlin.math.floor
 @Stable
 class RealtimeWaveformState internal constructor(
     val capacity: Int,
+    private val debugLabel: String = "waveform-${nextDebugId()}",
 ) {
     private val lock = Any()
     private val samples = IntArray(capacity)
@@ -26,6 +27,11 @@ class RealtimeWaveformState internal constructor(
     private var samplesSinceViewportUpdate = 0
     private var displayCenterSample = 0f
     private var displayRangeSamples = 0f
+    private var latestAppendCount = 0
+    private var latestMinimum = 0
+    private var latestMaximum = 0
+    private var latestPreview = intArrayOf()
+    private var lastDebugPublishAtMillis = 0L
     internal var revision by mutableStateOf(0)
         private set
 
@@ -36,6 +42,15 @@ class RealtimeWaveformState internal constructor(
     fun append(samples: IntArray) {
         if (samples.isEmpty()) return
         synchronized(lock) {
+            latestAppendCount = samples.size
+            latestMinimum = samples.minOrNull() ?: 0
+            latestMaximum = samples.maxOrNull() ?: 0
+            latestPreview = if (samples.size <= DEBUG_SAMPLE_PREVIEW_SIZE) {
+                samples.copyOf()
+            } else {
+                samples.take(DEBUG_SAMPLE_EDGE_SIZE).toIntArray() +
+                    samples.takeLast(DEBUG_SAMPLE_EDGE_SIZE).toIntArray()
+            }
             updateViewport(samples)
             samples.forEach { sample ->
                 val targetIndex = (totalSamples % capacity).toInt()
@@ -47,6 +62,7 @@ class RealtimeWaveformState internal constructor(
             if (renderedNextOrdinal < firstAvailableOrdinal) {
                 renderedNextOrdinal = firstAvailableOrdinal
             }
+            publishDebugSnapshot(force = true)
         }
     }
 
@@ -65,6 +81,7 @@ class RealtimeWaveformState internal constructor(
             if (actual > 0L) {
                 renderedNextOrdinal += actual
                 advanced = true
+                publishDebugSnapshot()
             }
             fractionalSamples = if (actual == requested) {
                 requestedWithFraction - requested
@@ -86,6 +103,11 @@ class RealtimeWaveformState internal constructor(
             samplesSinceViewportUpdate = 0
             displayCenterSample = 0f
             displayRangeSamples = 0f
+            latestAppendCount = 0
+            latestMinimum = 0
+            latestMaximum = 0
+            latestPreview = intArrayOf()
+            publishDebugSnapshot(force = true)
         }
         revision++
     }
@@ -158,19 +180,56 @@ class RealtimeWaveformState internal constructor(
         return sum.toFloat() / (endExclusive - start)
     }
 
+    private fun publishDebugSnapshot(force: Boolean = false) {
+        if (!WaveformDebugRegistry.isEnabled) return
+        val now = System.currentTimeMillis()
+        if (!force && now - lastDebugPublishAtMillis < DEBUG_PUBLISH_INTERVAL_MS) return
+        lastDebugPublishAtMillis = now
+        WaveformDebugRegistry.publish(
+            WaveformBufferDebugSnapshot(
+                label = debugLabel,
+                capacity = capacity,
+                storedSamples = storedSamples,
+                totalSamples = totalSamples,
+                firstOrdinal = maxOf(totalSamples - storedSamples, 0L),
+                renderedNextOrdinal = renderedNextOrdinal,
+                pendingSamples = (totalSamples - renderedNextOrdinal).coerceAtLeast(0L),
+                overwrittenSamples = (totalSamples - capacity).coerceAtLeast(0L),
+                viewportCenter = displayCenterSample,
+                viewportRange = displayRangeSamples,
+                latestAppendCount = latestAppendCount,
+                latestMinimum = latestMinimum,
+                latestMaximum = latestMaximum,
+                latestPreview = latestPreview.copyOf(),
+                updatedAtMillis = now,
+            ),
+        )
+    }
+
 }
 
 @Composable
 fun rememberRealtimeWaveformState(
     sampleRateHz: Int = 250,
     historyDurationSeconds: Int = 30,
+    debugLabel: String? = null,
 ): RealtimeWaveformState {
     require(sampleRateHz > 0)
     require(historyDurationSeconds > 0)
-    return remember(sampleRateHz, historyDurationSeconds) {
-        RealtimeWaveformState(sampleRateHz * historyDurationSeconds)
+    return remember(sampleRateHz, historyDurationSeconds, debugLabel) {
+        RealtimeWaveformState(
+            capacity = sampleRateHz * historyDurationSeconds,
+            debugLabel = debugLabel ?: "waveform-${nextDebugId()}",
+        )
     }
 }
 
 private const val VIEWPORT_RANGE_WINDOW_COUNT = 8
 private const val VIEWPORT_UPDATE_SAMPLE_COUNT = 500
+private const val DEBUG_SAMPLE_PREVIEW_SIZE = 16
+private const val DEBUG_SAMPLE_EDGE_SIZE = DEBUG_SAMPLE_PREVIEW_SIZE / 2
+private const val DEBUG_PUBLISH_INTERVAL_MS = 250L
+private var debugId = 0
+
+@Synchronized
+private fun nextDebugId(): Int = ++debugId

@@ -58,8 +58,8 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         val latestFrame = collectionBluetoothProvider.frames
             .collectAsStateWithLifecycle(initialValue = null)
             .value
-        val ecgWaveformState = rememberRealtimeWaveformState(sampleRateHz = 250)
-        val respirationWaveformState = rememberRealtimeWaveformState(sampleRateHz = 250)
+        val ecgWaveformState = rememberRealtimeWaveformState(sampleRateHz = 250, debugLabel = "ECG")
+        val respirationWaveformState = rememberRealtimeWaveformState(sampleRateHz = 250, debugLabel = "呼吸")
         LaunchedEffect(collectionBluetoothProvider) {
             collectionBluetoothProvider.ecgWaveforms.collect { frame ->
                 if (frame.continuity != FrameContinuity.DUPLICATE) {

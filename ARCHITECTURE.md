@@ -38,6 +38,10 @@ feature:user ──────────► core:storage
 - `feature:questionnaire`：采集前睡眠问卷、采集后热相关症状问卷。
 - `feature:collection`：采集流程 Activity，内部包含 BLE 扫描、连接、设备状态、实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程状态机的 MMKV Provider 实现；运行时权限在进入 Activity 前处理。
 - `feature:analysis`：异步 AI 分析任务及结果。
+- `debug:dokit-bluetooth`、`debug:dokit-protocol`、`debug:dokit-waveform`：仅通过
+  `app` 的 `debugImplementation` 接入的 DoKit 自定义工具，分别以可拖动的 App 内悬浮卡片
+  观察蓝牙原始收发、协议/指令交互和波形环形缓冲，并可进入完整详情页；不申请系统悬浮窗权限，
+  release 变体不打包 DoKit。
 
 业务模块之间不得添加直接 Gradle 依赖。首页用 `@Route` 暴露 Fragment，其他业务模块
 用 `@Route` 暴露 Activity 外部入口和 Fragment 内部入口。跨模块跳转统一经过 `core:navi`
