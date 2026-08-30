@@ -30,8 +30,6 @@ fun HomeScreen(
 ) {
     FlowPage(scrollable = false, navigationSafe = false, bottomBarSafe = true) {
         PatientCard(state.user, onEditUserInfo)
-        Spacer(Modifier.height(12.dp))
-        DeviceStatusCard(state.device)
         SectionTitle("采集流程", "${state.completedSteps}/${state.steps.size} 步完成", top = 15.dp)
         InfoCard(padding = PaddingValues(vertical = 5.dp, horizontal = 14.dp), spacing = 0.dp) {
             state.steps.forEach { ProcessStep(it) { onContinueStep(it.number) } }
@@ -92,20 +90,6 @@ private val Gender.displayName: String
         Gender.FEMALE -> "女"
         Gender.UNSPECIFIED -> ""
     }
-
-@Composable
-private fun DeviceStatusCard(device: DeviceSummary) {
-    InfoCard(padding = PaddingValues(15.dp), spacing = 0.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(46.dp, 60.dp).border(1.dp, VitalColors.TextSecondary, RoundedCornerShape(8.dp)))
-            Column(Modifier.padding(start = 18.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("${device.name}连接状态", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = VitalColors.TextPrimary)
-                Text(if (device.connected) "设备已连接" else "请先连接设备", fontSize = 13.sp, color = VitalColors.TextSecondary)
-            }
-            Text(if (device.connected) "已连接" else "未连接", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (device.connected) VitalColors.Success else VitalColors.Danger)
-        }
-    }
-}
 
 @Composable
 private fun ProcessStep(step: CollectionStep, onClick: () -> Unit) {

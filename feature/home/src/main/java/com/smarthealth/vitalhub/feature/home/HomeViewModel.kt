@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class DeviceSummary(val name: String, val connected: Boolean)
 data class CollectionStep(
     val number: Int,
     val title: String,
@@ -24,7 +23,6 @@ data class CollectionStep(
 )
 data class HomeUiState(
     val user: UserInfo? = null,
-    val device: DeviceSummary,
     val steps: List<CollectionStep>,
     val checkpoint: CollectionCheckpoint? = null,
     val progressError: String? = null,
@@ -37,7 +35,6 @@ data class HomeUiState(
 class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(
         HomeUiState(
-            device = DeviceSummary("记录仪", connected = false),
             steps = listOf(
                 CollectionStep(1, "采集前问卷", "填写基本信息与症状情况", false, true),
                 CollectionStep(2, "数据采集", "连接记录仪并完成数据采集", false, true),
