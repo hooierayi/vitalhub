@@ -4,6 +4,7 @@
 
 - `VitalHubApplication` 初始化 ARouter；仅在 debuggable 应用中开启 ARouter 日志和调试。
 - `MainActivity` 负责首页 edge-to-edge 窗口、应用标题栏、底部导航和首页 Fragment 返回栈。
+- Android 12+ 系统启动层显示位于自适应安全区内的小尺寸 VitalHub 品牌标识，Activity 就绪后直接进入首页，不再叠加带文字的二次开屏页。桌面图标复用安全区品牌标识，避免主体贴边或过大。
 - 首页以 Fragment 作为 ARouter 入口；其他 feature 以 Activity 作为跨模块 ARouter 入口，并在 Activity 内通过 ARouter 解析 Fragment。
 - 需要运行时权限的 Activity 路由由 app 层 `PermissionRouteInterceptor` 统一守卫。权限定义、受保护路径和弹窗实现均在应用组装时注入 `:core:permission`；feature 只在 Manifest 声明权限，不能在页面内直接申请。
 
