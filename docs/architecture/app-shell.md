@@ -38,9 +38,10 @@
 
 - 顶级底栏目前包含采集、记录、报告、我的；后 3 项目前由 app 内占位页面承载。
 - 顶级 Tab 不进入业务返回栈；子流程默认入栈并隐藏底栏。
-- 标题栏返回与系统返回共用 Activity 返回栈策略：片段采集、连续记录在 `CollectionFlowActivity` 内回到实时预览，采集后问卷回到首页；其他子流程按所属 Activity 的 Fragment 返回栈逐级回退。
+- 标题栏返回与系统返回共用 Activity 返回栈策略：片段采集、连续记录在 `CollectionFlowActivity` 内回到实时预览；问卷返回通过结束 `QuestionnaireActivity` 直接恢复其下的页面，其他子流程按所属 Activity 的 Fragment 返回栈逐级回退。
 - 所有新业务页面维持 Activity + Fragment + ComposeView 模式，首页仍由 MainActivity 承载 Fragment，Compose 内容在 feature 模块内实现。
-- 跨业务 Activity 的打开和关闭动画由应用 Theme 与 `FlowActivityTransitions` 统一提供；前进从右侧进入，返回向右退出，feature 不单独覆盖窗口动画。
+- 跨业务 Activity 的打开和关闭动画由应用 Theme 与 `FlowActivityTransitions` 统一提供；前进从右侧进入，返回向右退出，窗口保持不透明以避免前后页面重叠显影，feature 不单独覆盖窗口动画。
+- 顺序流程进入下一业务 Activity 时，等待 ARouter 确认目标已到达后再结束当前业务 Activity；权限拒绝或导航中断时保留当前页。后问卷完成后只结束 `QuestionnaireActivity`，直接恢复栈中的既有首页，不再次导航或重建首页。
 
 ## 4. 变更风险
 

@@ -198,11 +198,13 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         }
         when (transition) {
             is CollectionFlowTransition.Applied,
-            is CollectionFlowTransition.AlreadyApplied -> Navigator.flow(
-                requireContext(),
-                sessionId,
-                requireNotNull(transition.nextDestination),
-            )
+            is CollectionFlowTransition.AlreadyApplied -> {
+                Navigator.flow(
+                    requireContext(),
+                    sessionId,
+                    requireNotNull(transition.nextDestination),
+                )
+            }
             else -> viewModel.reportFlowError()
         }
     }

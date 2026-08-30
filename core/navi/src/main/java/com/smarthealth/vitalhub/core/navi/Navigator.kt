@@ -2,9 +2,10 @@ package com.smarthealth.vitalhub.core.navi
 
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import androidx.fragment.app.Fragment
+import com.alibaba.android.arouter.facade.Postcard
+import com.alibaba.android.arouter.facade.callback.NavigationCallback
 import com.alibaba.android.arouter.launcher.ARouter
 
 /** Cross-module Activity navigation plus ARouter-backed Fragment resolution for Activity-owned flows. */
@@ -12,12 +13,12 @@ object Navigator {
     fun home(host: FlowNavigationHost, clearBackStack: Boolean = true): FlowNavigationResult =
         fragment(host, Routes.HOME, key = Routes.HOME, addToBackStack = false, clearBackStack = clearBackStack)
 
-    fun returnHome(context: Context): FlowNavigationResult = activity(
-        context = context,
-        path = Routes.APP_HOME,
-        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
-        returning = true,
-    )
+    /** MainActivity remains below feature flows, so returning home only finishes the current Activity. */
+    fun returnHome(context: Context): FlowNavigationResult {
+        val activity = context as? Activity ?: return FlowNavigationResult.Busy
+        activity.finish()
+        return FlowNavigationResult.Navigated
+    }
 
     fun editUserInfo(context: Context): FlowNavigationResult = activity(context, Routes.USER_INFO_EDIT)
 
@@ -26,14 +27,35 @@ object Navigator {
         sessionId: String,
         destination: FlowDestination,
         entryMode: String = FlowEntryMode.SEQUENTIAL,
-    ): FlowNavigationResult = when (destination) {
-        FlowDestination.HOME -> returnHome(context)
-        FlowDestination.PRE_QUESTIONNAIRE -> questionnaire(context, sessionId, QuestionnairePhase.PRE, entryMode)
-        FlowDestination.POST_QUESTIONNAIRE -> questionnaire(context, sessionId, QuestionnairePhase.POST, entryMode)
-        FlowDestination.DEVICE_CONNECTION,
-        FlowDestination.LIVE_PREVIEW,
-        FlowDestination.CLIP_COLLECTION,
-        FlowDestination.CONTINUOUS_RECORDING -> collectionFlow(context, sessionId, destination, entryMode)
+    ): FlowNavigationResult {
+        val finishSourceOnArrival = context is BaseFlowActivity
+        return when (destination) {
+            FlowDestination.HOME -> returnHome(context)
+            FlowDestination.PRE_QUESTIONNAIRE -> questionnaire(
+                context,
+                sessionId,
+                QuestionnairePhase.PRE,
+                entryMode,
+                finishSourceOnArrival,
+            )
+            FlowDestination.POST_QUESTIONNAIRE -> questionnaire(
+                context,
+                sessionId,
+                QuestionnairePhase.POST,
+                entryMode,
+                finishSourceOnArrival,
+            )
+            FlowDestination.DEVICE_CONNECTION,
+            FlowDestination.LIVE_PREVIEW,
+            FlowDestination.CLIP_COLLECTION,
+            FlowDestination.CONTINUOUS_RECORDING -> collectionFlow(
+                context,
+                sessionId,
+                destination,
+                entryMode,
+                finishSourceOnArrival,
+            )
+        }
     }
 
     fun collection(
@@ -91,6 +113,7 @@ object Navigator {
         sessionId: String,
         phase: String,
         entryMode: String,
+        finishSourceOnArrival: Boolean,
     ): FlowNavigationResult = activity(
         context,
         Routes.QUESTIONNAIRE,
@@ -99,6 +122,7 @@ object Navigator {
             RouteArgs.QUESTIONNAIRE_PHASE to phase,
             RouteArgs.FLOW_ENTRY_MODE to entryMode,
         ),
+        finishSourceOnArrival,
     )
 
     private fun collectionFlow(
@@ -106,6 +130,7 @@ object Navigator {
         sessionId: String,
         destination: FlowDestination,
         entryMode: String,
+        finishSourceOnArrival: Boolean,
     ): FlowNavigationResult = activity(
         context,
         Routes.COLLECTION_FLOW,
@@ -114,6 +139,7 @@ object Navigator {
             RouteArgs.FLOW_DESTINATION to destination.name,
             RouteArgs.FLOW_ENTRY_MODE to entryMode,
         ),
+        finishSourceOnArrival,
     )
 
     private fun collectionPage(
@@ -138,13 +164,22 @@ object Navigator {
         context: Context,
         path: String,
         arguments: Bundle = Bundle(),
-        flags: Int = 0,
-        returning: Boolean = false,
+        finishSourceOnArrival: Boolean = false,
     ): FlowNavigationResult {
-        ARouter.getInstance().build(path).with(arguments).apply {
-            if (flags != 0) withFlags(flags)
-        }.navigation(context)
-        (context as? Activity)?.let { FlowActivityTransitions.applyAfterNavigation(it, returning) }
+        val sourceActivity = (context as? Activity)?.takeIf { finishSourceOnArrival }
+        val callback = sourceActivity?.let { source ->
+            object : NavigationCallback {
+                override fun onFound(postcard: Postcard) = Unit
+                override fun onLost(postcard: Postcard) = Unit
+                override fun onInterrupt(postcard: Postcard) = Unit
+
+                override fun onArrival(postcard: Postcard) {
+                    if (!source.isFinishing) source.finish()
+                }
+            }
+        }
+        ARouter.getInstance().build(path).with(arguments).navigation(context, callback)
+        (context as? Activity)?.let { FlowActivityTransitions.applyAfterNavigation(it, returning = false) }
         return FlowNavigationResult.Navigated
     }
 

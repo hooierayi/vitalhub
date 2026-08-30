@@ -70,6 +70,57 @@ class FlowNavigationInstrumentedTest {
     }
 
     @Test
+    fun finishing_questionnaire_reveals_existing_home_fragment() {
+        val sessionId = "return-home-session"
+        val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            var originalHome: androidx.fragment.app.Fragment? = null
+            scenario.onActivity { main ->
+                main.supportFragmentManager.executePendingTransactions()
+                originalHome = main.supportFragmentManager.findFragmentById(R.id.main_fragment_container)
+                Navigator.flow(main, sessionId, FlowDestination.PRE_QUESTIONNAIRE)
+            }
+
+            val questionnaire = waitForExistingActivity(QuestionnaireActivity::class.java)
+            runOnMain(questionnaire::finish)
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+            scenario.onActivity { main ->
+                main.supportFragmentManager.executePendingTransactions()
+                assertSame(
+                    originalHome,
+                    main.supportFragmentManager.findFragmentById(R.id.main_fragment_container),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun replacing_questionnaire_with_collection_finishes_questionnaire_after_arrival() {
+        grantCollectionPermission()
+        val sessionId = "questionnaire-to-collection-session"
+        val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            scenario.onActivity { main ->
+                Navigator.flow(main, sessionId, FlowDestination.PRE_QUESTIONNAIRE)
+            }
+
+            val questionnaire = waitForExistingActivity(QuestionnaireActivity::class.java)
+            runOnMain {
+                assertTrue(!questionnaire.isFinishing)
+                Navigator.flow(questionnaire, sessionId, FlowDestination.DEVICE_CONNECTION)
+            }
+
+            val collection = waitForExistingActivity(CollectionFlowActivity::class.java)
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            assertTrue(questionnaire.isFinishing)
+            runOnMain(collection::finish)
+        }
+    }
+
+    @Test
     fun collection_activity_resolves_fragments_and_coalesces_navigation() {
         val sessionId = "instrumented-session"
         val intent = Intent(ApplicationProvider.getApplicationContext(), CollectionFlowActivity::class.java)
@@ -162,6 +213,25 @@ class FlowNavigationInstrumentedTest {
                     ?.let(type::cast)
             }
             resumed?.let { return it }
+            SystemClock.sleep(ACTIVITY_WAIT_INTERVAL_MS)
+        }
+        assertTrue("Timed out waiting for ${type.simpleName}", false)
+        error("unreachable")
+    }
+
+    private fun <T : Activity> waitForExistingActivity(type: Class<T>): T {
+        val activeStages = listOf(Stage.RESUMED, Stage.STARTED, Stage.PAUSED, Stage.STOPPED, Stage.CREATED)
+        repeat(ACTIVITY_WAIT_ATTEMPTS) {
+            var activity: T? = null
+            runOnMain {
+                activity = activeStages.asSequence()
+                    .flatMap { stage ->
+                        ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(stage).asSequence()
+                    }
+                    .firstOrNull(type::isInstance)
+                    ?.let(type::cast)
+            }
+            activity?.let { return it }
             SystemClock.sleep(ACTIVITY_WAIT_INTERVAL_MS)
         }
         assertTrue("Timed out waiting for ${type.simpleName}", false)

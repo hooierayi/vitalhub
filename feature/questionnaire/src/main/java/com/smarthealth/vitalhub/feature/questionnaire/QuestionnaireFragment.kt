@@ -68,11 +68,14 @@ class QuestionnaireFragment : BaseFlowFragment(), AppBarDestination, FlowDestina
         }
         when (transition) {
             is CollectionFlowTransition.Applied,
-            is CollectionFlowTransition.AlreadyApplied -> Navigator.flow(
-                requireContext(),
-                sessionId,
-                requireNotNull(transition.nextDestination),
-            )
+            is CollectionFlowTransition.AlreadyApplied -> {
+                val destination = requireNotNull(transition.nextDestination)
+                if (destination == FlowDestination.HOME) {
+                    Navigator.returnHome(requireContext())
+                } else {
+                    Navigator.flow(requireContext(), sessionId, destination)
+                }
+            }
             else -> viewModel.reportFlowError()
         }
     }
