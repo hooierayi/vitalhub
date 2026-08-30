@@ -1,5 +1,6 @@
 package com.smarthealth.vitalhub.debug.dokit.bluetooth
 
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -31,6 +32,7 @@ class BluetoothDebugActivity : AppCompatActivity() {
         content = TextView(this).apply {
             setTextIsSelectable(true)
             movementMethod = ScrollingMovementMethod()
+            setTextColor(Color.rgb(31, 41, 55))
             setPadding(24, 16, 24, 24)
             textSize = 12f
         }
