@@ -10,7 +10,7 @@ import com.alibaba.android.arouter.facade.annotation.Route
 import com.alibaba.android.arouter.launcher.ARouter
 import com.smarthealth.vitalhub.core.navi.*
 import com.smarthealth.vitalhub.core.ui.BaseFlowFragment
-import com.smarthealth.vitalhub.core.waveform.rememberRealtimeWaveformState
+import com.smarthealth.vitalhub.foundation.device.waveform.ui.rememberRealtimeWaveformState
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProvider
 import com.smarthealth.vitalhub.feature.collection.shared.connectedDevice
 import com.smarthealth.vitalhub.foundation.device.api.CommandResult

@@ -1,4 +1,4 @@
-package com.smarthealth.vitalhub.core.waveform
+package com.smarthealth.vitalhub.foundation.device.waveform.ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

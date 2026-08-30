@@ -23,7 +23,7 @@ kapt {
 
 dependencies {
     implementation(project(":core:common"))
-    implementation(project(":core:waveform-ui"))
+    implementation(project(":foundation:device-waveform-ui"))
     implementation(project(":core:navi"))
     implementation(project(":core:storage"))
     implementation(project(":foundation:bluetooth"))

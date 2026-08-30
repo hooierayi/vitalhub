@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.smarthealth.vitalhub.core.waveform"
+    namespace = "com.smarthealth.vitalhub.foundation.device.waveform.ui"
     compileSdk = 34
 
     defaultConfig { minSdk = 24 }

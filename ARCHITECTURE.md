@@ -19,7 +19,7 @@ feature:user ──────────► core:storage
 
 - `app`：应用首页壳、`MainActivity`、Compose 底部导航、首页 Fragment 返回栈和 ARouter 初始化。
 - `core:common`：跨模块通用模型、Compose 主题与公共组件；不依赖任何业务模块。
-- `core:waveform-ui`：不依赖设备协议的实时波形 UI，按物理图纸标定绘制网格、ECG 和呼吸，提供固定容量采样环形缓冲、扫屏与滚动模式。
+- `foundation:device-waveform-ui`：不依赖设备协议的实时波形 UI，按物理图纸标定绘制网格、ECG 和呼吸，提供固定容量采样环形缓冲、扫屏与滚动模式。
 - `core:navi`：ARouter 路径与参数、`Navigator`、Fragment 导航宿主契约、流程返回策略与导航去重；不依赖业务 feature。
 - `core:permission`：可注入的运行时权限定义、统一检查/申请、端内拒绝兜底弹窗及应用设置页跳转；不依赖业务 feature。应用层注入权限、路由守卫、前台 Activity 来源和弹窗实现，具体权限声明由使用它的 feature Manifest 提供。
 - `core:storage`：可复用的本地键值存储，提供 SharedPreferences/MMKV 后端、批量编辑和可选 Android Keystore 加密。

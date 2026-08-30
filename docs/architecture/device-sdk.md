@@ -78,11 +78,11 @@ EcgWaveformFrame / RespirationWaveformFrame
 RealtimeWaveformState.append(IntArray)
   ↓ 固定容量 IntArray 环形缓冲
 按 250 Hz 推进的显示游标（屏幕 VSync 刷新）
-  ↓ core:waveform-ui
+  ↓ foundation:device-waveform-ui
 物理图纸网格 + Sweep / Scroll + ECG / 呼吸波形
 ```
 
-`:core:waveform-ui` 不依赖 `DeviceSession` 或 `FrameContinuity`。View 首次创建时从第一个采样起笔；数据中断时显示游标在已有数据末尾等待，新数组到达后继续当前轨迹，只有 View 重建或显式 `clear()` 才重新从头开始。重复帧不送入绘制缓冲。组件使用 `xdpi / ydpi` 将毫米换算为像素，并接受横纵校准系数修正设备上报误差。标准配置为 250 Hz、25 mm/s、10 mm/mV，此时 10 个采样点对应横向 1 mm。接收端可一次追加 250 点，显示游标仍按采样率平滑消费，避免每秒整段跳变。
+`:foundation:device-waveform-ui` 不依赖 `DeviceSession` 或 `FrameContinuity`。View 首次创建时从第一个采样起笔；数据中断时显示游标在已有数据末尾等待，新数组到达后继续当前轨迹，只有 View 重建或显式 `clear()` 才重新从头开始。重复帧不送入绘制缓冲。组件使用 `xdpi / ydpi` 将毫米换算为像素，并接受横纵校准系数修正设备上报误差。标准配置为 250 Hz、25 mm/s、10 mm/mV，此时 10 个采样点对应横向 1 mm。接收端可一次追加 250 点，显示游标仍按采样率平滑消费，避免每秒整段跳变。
 
 纵向显示借鉴 Asclepius 的坐标原点与增益分离策略：采样环形缓冲始终保存协议解析后的原始有符号整数，近期分包极值只用于计算绘图视口中心，不对采样数组做基线相减，也不做滤波。视口每 500 个采样使用最近 8 个分包的截尾极值重算，降低单个尖峰造成的跳动。ECG 使用 `WaveformGainMode.FIXED` 保持配置的真实图纸增益；`FIT_STANDARD_GAIN` 可在 20、10、5 mm/mV 中选择标准档位。呼吸波形不按心电图纸显示，隐藏毫米网格和校准脉冲，使用 `FIT_VISIBLE_RANGE` 将近期振幅连续适配到可用高度。
 

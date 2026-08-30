@@ -1,4 +1,4 @@
-package com.smarthealth.vitalhub.core.waveform
+package com.smarthealth.vitalhub.foundation.device.waveform.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
