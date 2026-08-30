@@ -41,7 +41,7 @@ import java.util.Locale
 
 @Composable
 fun AppSectionScreen(state: AppSectionUiState) {
-    FlowPage(scrollable = false, bottomBarSafe = true) {
+    FlowPage(scrollable = false, navigationSafe = false, bottomBarSafe = true) {
         SectionTitle(
             text = state.section,
             trailing = if (state.key == BottomNavigationKeys.RECORDS && !state.recordsLoading) {
@@ -66,7 +66,6 @@ fun AppSectionScreen(state: AppSectionUiState) {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(bottom = 12.dp),
                 ) {
                     items(
                         items = state.records,

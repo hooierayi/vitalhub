@@ -1,7 +1,9 @@
 package com.smarthealth.vitalhub
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,20 +39,23 @@ private val bottomItems = listOf(
 @Composable
 fun AppBottomNavigation(selectedKey: String, onSelected: (String) -> Unit) {
     Surface(color = Color.White, shadowElevation = 3.dp) {
-        Row(
-            Modifier.fillMaxWidth().navigationBarsPadding().height(71.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            bottomItems.forEach { item ->
-                val color = if (selectedKey == item.key) VitalColors.Teal else VitalColors.TextSecondary
-                Column(
-                    Modifier.weight(1f).height(71.dp).clickable { onSelected(item.key) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(item.icon, item.label, tint = color, modifier = Modifier.height(25.dp))
-                    Text(item.label, fontSize = 13.sp, color = color)
+        Column(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(VitalColors.Border))
+            Row(
+                Modifier.fillMaxWidth().navigationBarsPadding().height(71.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                bottomItems.forEach { item ->
+                    val color = if (selectedKey == item.key) VitalColors.Teal else VitalColors.TextSecondary
+                    Column(
+                        Modifier.weight(1f).height(71.dp).clickable { onSelected(item.key) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(item.icon, item.label, tint = color, modifier = Modifier.height(25.dp))
+                        Text(item.label, fontSize = 13.sp, color = color)
+                    }
                 }
             }
         }
