@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -372,7 +373,19 @@ private fun DeviceSummary(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier.height(70.dp)) {
-        Box(Modifier.size(40.dp, 58.dp).border(1.dp, VitalColors.TextSecondary, RoundedCornerShape(7.dp)))
+        Box(
+            modifier = Modifier
+                .size(40.dp, 58.dp)
+                .border(1.dp, VitalColors.TextSecondary, RoundedCornerShape(7.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Sensors,
+                contentDescription = null,
+                tint = VitalColors.Teal,
+                modifier = Modifier.size(28.dp),
+            )
+        }
         Column(Modifier.padding(start = 16.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
