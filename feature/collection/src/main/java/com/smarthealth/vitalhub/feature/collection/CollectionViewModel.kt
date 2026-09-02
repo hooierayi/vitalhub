@@ -31,7 +31,10 @@ data class CollectionUiState(
     val isClipCollecting: Boolean = false,
     val clipCountdownFinished: Boolean = false,
     val isContinuousRecording: Boolean = false,
+    val isContinuousStartedThisVisit: Boolean = false,
     val isContinuousStartLoading: Boolean = false,
+    val isContinuousNavigationLoading: Boolean = false,
+    val isContinuousReturnLoading: Boolean = false,
     val recordingElapsed: String = "00:00:00",
     val recordId: String = "REC-000000000000",
     val startedAt: String = "2024-05-21  09:41:32",
@@ -46,6 +49,8 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
             .also { savedStateHandle[RECORD_ID_KEY] = it }
     private val isContinuousRecording = mode == CollectionMode.CONTINUOUS &&
         savedStateHandle.get<Boolean>(CONTINUOUS_IS_RECORDING_KEY) == true
+    private val isContinuousStartedThisVisit = mode == CollectionMode.CONTINUOUS &&
+        savedStateHandle.get<Boolean>(CONTINUOUS_STARTED_THIS_VISIT_KEY) == true
     private val continuousStartedAt = if (isContinuousRecording) {
         savedStateHandle.get<Long>(RECORD_STARTED_AT_KEY)
             ?: System.currentTimeMillis().also { savedStateHandle[RECORD_STARTED_AT_KEY] = it }
@@ -57,6 +62,7 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         mode = mode,
         recordId = recordId,
         isContinuousRecording = isContinuousRecording,
+        isContinuousStartedThisVisit = isContinuousStartedThisVisit,
         recordingElapsed = continuousStartedAt.takeIf { it > 0L }
             ?.let { formatContinuousElapsed(System.currentTimeMillis() - it) }
             ?: "00:00:00",
@@ -125,8 +131,11 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         val startedAt = System.currentTimeMillis()
         savedStateHandle[RECORD_STARTED_AT_KEY] = startedAt
         savedStateHandle[CONTINUOUS_IS_RECORDING_KEY] = true
+        savedStateHandle[CONTINUOUS_STARTED_THIS_VISIT_KEY] = true
         _uiState.value = _uiState.value.copy(
+            recordId = recordId,
             isContinuousRecording = true,
+            isContinuousStartedThisVisit = true,
             recordingElapsed = "00:00:00",
             startedAt = formatRecordTime(startedAt),
             flowError = null,
@@ -140,7 +149,11 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
 
     fun beginContinuousStart(): Boolean {
         val state = _uiState.value
-        if (state.isContinuousStartLoading) return false
+        val canStart = canBeginContinuousStart(
+            state.isContinuousStartLoading,
+            state.isContinuousStartedThisVisit,
+        )
+        if (!canStart) return false
         _uiState.value = state.copy(
             isContinuousStartLoading = true,
             flowError = null,
@@ -162,9 +175,6 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
             enteredAtEpochMillis = enteredAtEpochMillis,
             recordStartedAtEpochMillis = record.startedAtEpochMillis,
         )
-        savedStateHandle[RECORD_ID_KEY] = record.id
-        savedStateHandle[RECORD_STARTED_AT_KEY] = record.startedAtEpochMillis
-        savedStateHandle[CONTINUOUS_IS_RECORDING_KEY] = true
         _uiState.value = _uiState.value.copy(
             recordId = record.id,
             startedAt = formatRecordTime(record.startedAtEpochMillis),
@@ -176,6 +186,23 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         startContinuousTimer(
             initialElapsedMillis = initialElapsedMillis,
             timerAnchorEpochMillis = enteredAtEpochMillis,
+        )
+    }
+
+    fun beginContinuousNavigation(isReturnAction: Boolean): Boolean {
+        if (_uiState.value.isContinuousNavigationLoading) return false
+        _uiState.value = _uiState.value.copy(
+            isContinuousNavigationLoading = true,
+            isContinuousReturnLoading = isReturnAction,
+            flowError = null,
+        )
+        return true
+    }
+
+    fun finishContinuousNavigation() {
+        _uiState.value = _uiState.value.copy(
+            isContinuousNavigationLoading = false,
+            isContinuousReturnLoading = false,
         )
     }
 
@@ -295,6 +322,7 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         const val PROGRESS_UPDATE_INTERVAL_MILLIS = 100L
         const val CONTINUOUS_TIMER_INTERVAL_MILLIS = 1_000L
         const val CONTINUOUS_IS_RECORDING_KEY = "continuousIsRecording"
+        const val CONTINUOUS_STARTED_THIS_VISIT_KEY = "continuousStartedThisVisit"
         const val RECORD_ID_KEY = "recordId"
         const val RECORD_STARTED_AT_KEY = "recordStartedAt"
         const val RECORD_FILE_PATH_KEY = "recordFilePath"
@@ -324,3 +352,8 @@ internal fun continuousElapsedAtEntry(
     enteredAtEpochMillis: Long,
     recordStartedAtEpochMillis: Long,
 ): Long = (enteredAtEpochMillis - recordStartedAtEpochMillis).coerceAtLeast(0L)
+
+internal fun canBeginContinuousStart(
+    isLoading: Boolean,
+    isStartedThisVisit: Boolean,
+): Boolean = !isLoading && !isStartedThisVisit

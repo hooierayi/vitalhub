@@ -102,7 +102,7 @@ class CollectionFlowActivity : BaseFlowActivity() {
         val dialog = AlertDialog.Builder(this)
             .setTitle("蓝牙连接已断开")
             .setMessage("记录仪连接已中断，请退出采集或重新连接设备。")
-            .setNegativeButton("退出") { _, _ -> exitToCollectionHome() }
+            .setNegativeButton("退出") { _, _ -> returnToCollectionHome() }
             .setPositiveButton("重新连接", null)
             .setCancelable(false)
             .create()
@@ -141,7 +141,7 @@ class CollectionFlowActivity : BaseFlowActivity() {
         }
     }
 
-    private fun exitToCollectionHome() {
+    internal fun returnToCollectionHome() {
         lifecycleScope.launch {
             runCatching { collectionBluetoothProvider.stopRecording() }
             val hasRetainedHome = supportFragmentManager.fragments.any {

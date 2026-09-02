@@ -58,6 +58,29 @@ class CollectionViewModelTest {
     }
 
     @Test
+    fun `continuous recording cannot be started again after success in this visit`() {
+        assertFalse(canBeginContinuousStart(isLoading = false, isStartedThisVisit = true))
+        assertFalse(canBeginContinuousStart(isLoading = true, isStartedThisVisit = false))
+        assertTrue(canBeginContinuousStart(isLoading = false, isStartedThisVisit = false))
+    }
+
+    @Test
+    fun `continuous navigation loading prevents duplicate actions and can reset`() {
+        val viewModel = CollectionViewModel(
+            SavedStateHandle(
+                mapOf(RouteArgs.COLLECTION_MODE to CollectionMode.CONTINUOUS),
+            ),
+        )
+
+        assertTrue(viewModel.beginContinuousNavigation(isReturnAction = false))
+        assertFalse(viewModel.uiState.value.isContinuousReturnLoading)
+        assertFalse(viewModel.beginContinuousNavigation(isReturnAction = true))
+        viewModel.finishContinuousNavigation()
+        assertTrue(viewModel.beginContinuousNavigation(isReturnAction = true))
+        assertTrue(viewModel.uiState.value.isContinuousReturnLoading)
+    }
+
+    @Test
     fun `clearing an error does not remove a newer message`() {
         val viewModel = CollectionViewModel(SavedStateHandle())
         viewModel.reportDeviceError("new error")

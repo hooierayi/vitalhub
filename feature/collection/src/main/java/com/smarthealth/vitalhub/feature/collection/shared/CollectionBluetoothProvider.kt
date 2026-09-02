@@ -236,6 +236,36 @@ class CollectionBluetoothProvider(
 
     suspend fun execute(command: DeviceCommand): CommandResult = deviceSession.execute(command)
 
+    /** Disconnects the app while leaving device-side continuous recording untouched. */
+    suspend fun disconnectKeepingContinuousRecording(): Boolean {
+        val state = _uiState.value
+        val connectedDeviceId = state.connectedDeviceId ?: return true
+        if (state.deviceOperation != null) return false
+        _uiState.value = state.copy(
+            deviceOperation = DeviceConnectionOperation.DISCONNECTING,
+            connectedDeviceId = null,
+            connectionError = null,
+        )
+        return runCatching { deviceSession.disconnect() }
+            .fold(
+                onSuccess = {
+                    _uiState.value = _uiState.value.copy(
+                        deviceOperation = null,
+                        connectionError = null,
+                    )
+                    true
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        deviceOperation = null,
+                        connectedDeviceId = connectedDeviceId,
+                        connectionError = error.message ?: "蓝牙断开失败",
+                    )
+                    false
+                },
+            )
+    }
+
     suspend fun startRecording(targetPath: String) = deviceSession.startRecording(targetPath)
 
     suspend fun stopRecording() = deviceSession.stopRecording()

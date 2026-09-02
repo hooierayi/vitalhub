@@ -135,11 +135,19 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
                 openContinuousPage(host, state.sessionId)
             },
             onPreview = {
-                returnToPreview(host, state.sessionId, state.isClipCollecting)
+                if (
+                    state.mode == CollectionMode.CONTINUOUS &&
+                    state.isContinuousStartedThisVisit
+                ) {
+                    startPreviewAfterContinuousRecording(host, state.sessionId)
+                } else {
+                    returnToPreview(host, state.sessionId, state.isClipCollecting)
+                }
             },
             onStopClip = { pauseClipCollection() },
             onRestartClip = { restartClipRecording(state.sessionId) },
             onStartContinuousRecording = { startContinuousRecording() },
+            onReturnToDeviceConnection = { disconnectAndReturnToDeviceConnection() },
         )
     }
 
@@ -165,6 +173,24 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         if (!viewModel.beginContinuousStart()) return
         viewLifecycleOwner.lifecycleScope.launch {
             try {
+                when (val result = collectionBluetoothProvider.execute(DeviceCommand.StopCollection)) {
+                    CommandResult.Success -> Unit
+                    is CommandResult.Rejected -> {
+                        viewModel.reportDeviceError(
+                            "设备拒绝停止采集，状态码=${result.status}",
+                        )
+                        return@launch
+                    }
+                    is CommandResult.Failed -> {
+                        viewModel.reportDeviceError(
+                            result.cause.message
+                                ?.takeIf(String::isNotBlank)
+                                ?.let { "停止采集失败：$it" }
+                                ?: "停止采集指令失败",
+                        )
+                        return@launch
+                    }
+                }
                 val user = runCatching {
                     ARouter.getInstance().navigation(UserInfoProvider::class.java)?.getUser()
                 }.getOrNull()
@@ -206,6 +232,48 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
                 }
             } finally {
                 viewModel.finishContinuousStart()
+            }
+        }
+    }
+
+    private fun startPreviewAfterContinuousRecording(
+        host: FlowNavigationHost,
+        sessionId: String,
+    ) {
+        if (!viewModel.beginContinuousNavigation(isReturnAction = false)) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                when (val result = collectionBluetoothProvider.execute(DeviceCommand.StartCollection)) {
+                    CommandResult.Success -> returnToPreview(host, sessionId, isCollecting = false)
+                    is CommandResult.Rejected -> viewModel.reportDeviceError(
+                        "设备拒绝启动采集，状态码=${result.status}",
+                    )
+                    is CommandResult.Failed -> viewModel.reportDeviceError(
+                        result.cause.message
+                            ?.takeIf(String::isNotBlank)
+                            ?.let { "启动采集失败：$it" }
+                            ?: "启动采集指令失败",
+                    )
+                }
+            } finally {
+                viewModel.finishContinuousNavigation()
+            }
+        }
+    }
+
+    private fun disconnectAndReturnToDeviceConnection() {
+        if (!viewModel.beginContinuousNavigation(isReturnAction = true)) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val disconnected = collectionBluetoothProvider
+                    .disconnectKeepingContinuousRecording()
+                if (disconnected) {
+                    (requireActivity() as CollectionFlowActivity).returnToCollectionHome()
+                } else {
+                    viewModel.reportDeviceError("蓝牙断开失败，请重试")
+                }
+            } finally {
+                viewModel.finishContinuousNavigation()
             }
         }
     }

@@ -55,6 +55,7 @@ fun CollectionScreen(
     onStopClip: () -> Unit,
     onRestartClip: () -> Unit,
     onStartContinuousRecording: () -> Unit,
+    onReturnToDeviceConnection: () -> Unit,
 ) {
     when (state.mode) {
         CollectionMode.CLIP -> ClipPage(
@@ -73,6 +74,7 @@ fun CollectionScreen(
             device = device,
             onPreview = onPreview,
             onStart = onStartContinuousRecording,
+            onReturnToDeviceConnection = onReturnToDeviceConnection,
         )
         else -> PreviewPage(
             state,
@@ -401,12 +403,15 @@ private fun ClipPage(
 }
 
 @Composable
-private fun RealtimePreviewAction(onClick: () -> Unit) {
+private fun RealtimePreviewAction(
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
     Column(
         modifier = Modifier
             .width(72.dp)
             .height(51.dp)
-            .clickable(role = Role.Button, onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -522,6 +527,7 @@ private fun ContinuousPage(
     device: BluetoothKitDevice?,
     onPreview: () -> Unit,
     onStart: () -> Unit,
+    onReturnToDeviceConnection: () -> Unit,
 ) {
     FlowPage(scrollable = false) {
         InfoCard(background = Color(0xFFF5FBF9), padding = PaddingValues(17.dp), spacing = 0.dp) {
@@ -543,23 +549,39 @@ private fun ContinuousPage(
             )
         }
         Spacer(Modifier.weight(1f))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RealtimePreviewAction(onClick = onPreview)
-            FlowButton(
-                label = when {
-                    state.isContinuousStartLoading -> "启动中"
-                    state.isContinuousRecording -> "记录中（点击可重新启动记录）"
-                    else -> "启动记录"
-                },
-                style = FlowButtonStyle.PRIMARY,
-                modifier = Modifier.weight(1f).height(51.dp),
-                onClick = onStart,
-                loading = state.isContinuousStartLoading,
-            )
+        if (state.isContinuousStartedThisVisit) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RealtimePreviewAction(
+                    onClick = onPreview,
+                    enabled = !state.isContinuousNavigationLoading,
+                )
+                FlowButton(
+                    label = if (state.isContinuousReturnLoading) "断开中" else "返回连接记录仪页面",
+                    style = FlowButtonStyle.PRIMARY,
+                    modifier = Modifier.weight(1f).height(51.dp),
+                    onClick = onReturnToDeviceConnection,
+                    loading = state.isContinuousReturnLoading,
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RealtimePreviewAction(onClick = onPreview)
+                FlowButton(
+                    label = if (state.isContinuousStartLoading) "启动中" else "启动记录",
+                    style = FlowButtonStyle.PRIMARY,
+                    modifier = Modifier.weight(1f).height(51.dp),
+                    onClick = onStart,
+                    loading = state.isContinuousStartLoading,
+                )
+            }
         }
         Spacer(Modifier.height(9.dp))
     }
