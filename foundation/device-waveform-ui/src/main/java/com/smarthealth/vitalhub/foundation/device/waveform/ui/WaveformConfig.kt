@@ -15,6 +15,7 @@ enum class WaveformRenderMode {
 }
 
 enum class PaperSpeed(val millimetersPerSecond: Float) {
+    MM_6_25_PER_SECOND(6.25f),
     MM_12_5_PER_SECOND(12.5f),
     MM_25_PER_SECOND(25f),
     MM_50_PER_SECOND(50f),

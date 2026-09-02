@@ -16,6 +16,18 @@ class WaveformConfigTest {
     }
 
     @Test
+    fun respirationPaperAt250HzUsesSixPointTwoFiveMillimetersPerSecond() {
+        val config = WaveformPaperConfig(
+            sampleRateHz = 250,
+            paperSpeed = PaperSpeed.MM_6_25_PER_SECOND,
+        )
+
+        assertEquals(6.25f, config.paperSpeed.millimetersPerSecond, 0.0001f)
+        assertEquals(0.025f, config.sampleSpacingMillimeters, 0.0001f)
+        assertEquals(40f, config.samplesPerSmallGrid, 0.0001f)
+    }
+
+    @Test
     fun signalCalibrationsMapSignedLimitsSymmetrically() {
         assertEquals(400f, SignalCalibrations.Ecg.toMillivolts(32_767), 0.001f)
         assertEquals(-400f, SignalCalibrations.Ecg.toMillivolts(-32_768), 0.001f)

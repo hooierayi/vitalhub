@@ -112,6 +112,7 @@ fun RespirationWaveform(
     state: RealtimeWaveformState,
     modifier: Modifier = Modifier,
     renderMode: WaveformRenderMode = WaveformRenderMode.SWEEP,
+    paperSpeed: PaperSpeed = PaperSpeed.MM_6_25_PER_SECOND,
     gain: PaperGain = PaperGain.MM_10_PER_MV,
     gainMode: WaveformGainMode = WaveformGainMode.FIT_VISIBLE_RANGE,
     physicalMetrics: PhysicalPaperMetrics = rememberPhysicalPaperMetrics(),
@@ -121,6 +122,7 @@ fun RespirationWaveform(
         signalCalibration = SignalCalibrations.Respiration,
         modifier = modifier,
         paperConfig = WaveformPaperConfig(
+            paperSpeed = paperSpeed,
             gain = gain,
             gainMode = gainMode,
             renderMode = renderMode,

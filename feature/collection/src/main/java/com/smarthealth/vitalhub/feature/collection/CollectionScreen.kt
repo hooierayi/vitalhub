@@ -158,12 +158,13 @@ private fun LiveDataDashboard(
             }
             WaveformPanel(
                 title = "RESP",
-                trailing = "阻抗",
+                trailing = "阻抗 · ${RESP_PAPER_SPEED.millimetersPerSecond} mm/s · AUTO",
                 modifier = Modifier.weight(1f),
             ) {
                 RespirationWaveform(
                     state = respirationWaveformState,
                     modifier = Modifier.fillMaxSize(),
+                    paperSpeed = RESP_PAPER_SPEED,
                 )
             }
         }
@@ -605,3 +606,4 @@ private fun ConnectedBanner(device: BluetoothKitDevice?, isConnected: Boolean) {
 }
 private val ECG_PAPER_SPEED = PaperSpeed.MM_25_PER_SECOND
 private val ECG_GAIN = PaperGain.MM_10_PER_MV
+private val RESP_PAPER_SPEED = PaperSpeed.MM_6_25_PER_SECOND
