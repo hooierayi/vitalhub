@@ -150,9 +150,9 @@ private class RecorderPacketDecoder(
         val ecg = IntArray(250) { readShort(bytes, offset).toInt().also { offset += 2 } }
         val respiration = IntArray(250) { readSigned24(bytes, offset).also { offset += 3 } }
         val temperature = TemperatureBlock(
-            skinCelsius = unsigned16(bytes, offset).also { offset += 2 } / 100.0,
-            ambientCelsius = unsigned16(bytes, offset).also { offset += 2 } / 100.0,
-            humidityPercent = unsigned16(bytes, offset).also { offset += 2 } / 100.0,
+            skinCelsius = readShort(bytes, offset).also { offset += 2 } / 100.0,
+            ambientCelsius = readShort(bytes, offset).also { offset += 2 } / 100.0,
+            humidityPercent = readShort(bytes, offset).also { offset += 2 } / 100.0,
         )
         val motion = List(5) {
             MotionSample(

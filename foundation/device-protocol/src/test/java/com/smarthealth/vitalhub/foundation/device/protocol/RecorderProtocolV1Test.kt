@@ -81,6 +81,22 @@ class RecorderProtocolV1Test {
         assertEquals(8_388_607, parsed.respiration[1])
     }
 
+    @Test
+    fun parsesTemperatureAndHumidityAsSignedBigEndianValues() {
+        val frame = dataFrame(sequence = 9).also { bytes ->
+            put16(bytes, 1_254, -999)
+            put16(bytes, 1_256, -250)
+            put16(bytes, 1_258, -1)
+            applyChecksum(bytes)
+        }
+
+        val parsed = (engine.feed(frame).single() as ProtocolPacket.Data).frame
+
+        assertEquals(-9.99, parsed.temperature.skinCelsius, 0.001)
+        assertEquals(-2.50, parsed.temperature.ambientCelsius, 0.001)
+        assertEquals(-0.01, parsed.temperature.humidityPercent, 0.001)
+    }
+
     private fun dataFrame(sequence: Int): ByteArray {
         val bytes = ByteArray(1_323)
         bytes[0] = 0xAA.toByte()

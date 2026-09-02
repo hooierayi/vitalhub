@@ -4,16 +4,31 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.kapt)
 }
 
+fun buildConfigString(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val collectionAppVersion = providers.gradleProperty("versionName").orElse("1.0")
+
 android {
     namespace = "com.smarthealth.vitalhub.feature.collection"
     compileSdk = 34
-    defaultConfig { minSdk = 24 }
+    defaultConfig {
+        minSdk = 24
+        buildConfigField(
+            "String",
+            "COLLECTION_APP_VERSION",
+            buildConfigString(collectionAppVersion.get()),
+        )
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions { jvmTarget = "1.8" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     composeOptions { kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get() }
 }
 
@@ -32,6 +47,7 @@ dependencies {
     implementation(project(":foundation:bluetooth"))
     implementation(project(":foundation:device-api"))
     implementation(project(":foundation:device-sdk"))
+    implementation(project(":foundation:file-protocol"))
     implementation(project(":provider:collection"))
     implementation(project(":provider:device"))
     implementation(project(":provider:record"))

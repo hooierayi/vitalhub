@@ -12,7 +12,6 @@ import com.smarthealth.vitalhub.foundation.device.command.RecorderCommandEncoder
 import com.smarthealth.vitalhub.foundation.device.command.RecorderCommandRegistry
 import com.smarthealth.vitalhub.foundation.device.protocol.RecorderProtocolV1
 import com.smarthealth.vitalhub.foundation.device.protocol.RecorderProtocolV1Config
-import com.smarthealth.vitalhub.foundation.device.storage.BinaryFrameRecorder
 import com.smarthealth.vitalhub.foundation.device.transport.BluetoothChannelType
 import com.smarthealth.vitalhub.foundation.device.transport.BluetoothDeviceProfile
 import com.smarthealth.vitalhub.foundation.device.transport.BluetoothDeviceProfileResolver
@@ -108,7 +107,6 @@ object RecorderDeviceSdk {
                 )
             },
             commandEncoder = RecorderCommandEncoder(),
-            recorderFactory = { scope -> BinaryFrameRecorder(scope, trace = trace) },
             waveformFactory = { DefaultWaveformPipeline(trace = trace) },
             trace = trace,
         )

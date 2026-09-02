@@ -16,6 +16,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://dcm4che.org/maven2") {
+            content { includeGroup("org.dcm4che") }
+        }
+        maven("https://raw.githubusercontent.com/nroduit/mvn-repo/master/") {
+            content { includeGroup("org.weasis.core") }
+        }
         maven("https://jitpack.io") {
             content { includeGroup("com.github.ybq") }
         }
@@ -34,6 +40,7 @@ include(":foundation:device-transport")
 include(":foundation:device-protocol")
 include(":foundation:device-command")
 include(":foundation:device-storage")
+include(":foundation:file-protocol")
 include(":foundation:device-waveform")
 include(":foundation:device-waveform-ui")
 include(":foundation:device-sdk")

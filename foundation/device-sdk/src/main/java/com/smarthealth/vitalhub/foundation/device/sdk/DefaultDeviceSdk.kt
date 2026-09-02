@@ -7,14 +7,13 @@ import com.smarthealth.vitalhub.foundation.device.api.DeviceSdk
 import com.smarthealth.vitalhub.foundation.device.api.DeviceSession
 import com.smarthealth.vitalhub.foundation.device.api.DeviceTrace
 import com.smarthealth.vitalhub.foundation.device.api.EcgWaveformFrame
-import com.smarthealth.vitalhub.foundation.device.api.RecordingState
 import com.smarthealth.vitalhub.foundation.device.api.RecorderFrame
+import com.smarthealth.vitalhub.foundation.device.api.RecorderFrameSink
 import com.smarthealth.vitalhub.foundation.device.api.RespirationWaveformFrame
 import com.smarthealth.vitalhub.foundation.device.command.DeviceCommandEncoder
 import com.smarthealth.vitalhub.foundation.device.command.SerialCommandExecutor
 import com.smarthealth.vitalhub.foundation.device.protocol.ProtocolEngineFactory
 import com.smarthealth.vitalhub.foundation.device.protocol.ProtocolPacket
-import com.smarthealth.vitalhub.foundation.device.storage.FrameRecorderFactory
 import com.smarthealth.vitalhub.foundation.device.transport.DeviceTransportFactory
 import com.smarthealth.vitalhub.foundation.device.transport.TransportState
 import com.smarthealth.vitalhub.foundation.device.waveform.WaveformPipelineFactory
@@ -36,12 +35,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class DefaultDeviceSdk(
     private val transportFactory: DeviceTransportFactory,
     private val protocolFactory: ProtocolEngineFactory,
     private val commandEncoder: DeviceCommandEncoder,
-    private val recorderFactory: FrameRecorderFactory,
     private val waveformFactory: WaveformPipelineFactory,
     private val trace: DeviceTrace = DeviceTrace.NONE,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -50,7 +50,6 @@ class DefaultDeviceSdk(
         transportFactory = transportFactory,
         protocolFactory = protocolFactory,
         commandEncoder = commandEncoder,
-        recorderFactory = recorderFactory,
         waveformFactory = waveformFactory,
         trace = trace,
         dispatcher = dispatcher,
@@ -61,7 +60,6 @@ private class DefaultDeviceSession(
     transportFactory: DeviceTransportFactory,
     protocolFactory: ProtocolEngineFactory,
     commandEncoder: DeviceCommandEncoder,
-    recorderFactory: FrameRecorderFactory,
     waveformFactory: WaveformPipelineFactory,
     private val trace: DeviceTrace,
     dispatcher: CoroutineDispatcher,
@@ -69,7 +67,6 @@ private class DefaultDeviceSession(
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val transport = transportFactory.create()
     private val protocol = protocolFactory.create()
-    private val recorder = recorderFactory.create(scope)
     private val waveform = waveformFactory.create()
     private val commands = SerialCommandExecutor(transport, commandEncoder, scope, trace = trace)
     private val mutableFrames = MutableSharedFlow<RecorderFrame>(
@@ -78,6 +75,8 @@ private class DefaultDeviceSession(
     )
     private val mutableMetrics = MutableStateFlow<DeviceMetrics?>(null)
     private val mutableDiagnostics = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    private val recordingSinkMutex = Mutex()
+    private var recordingSink: RecorderFrameSink? = null
 
     override val connected: StateFlow<Boolean> = transport.state
         .map { it == TransportState.CONNECTED }
@@ -86,7 +85,6 @@ private class DefaultDeviceSession(
     override val ecgWaveforms: Flow<EcgWaveformFrame> = waveform.ecgFrames
     override val respirationWaveforms: Flow<RespirationWaveformFrame> = waveform.respirationFrames
     override val metrics: StateFlow<DeviceMetrics?> = mutableMetrics.asStateFlow()
-    override val recordingState: StateFlow<RecordingState> = recorder.state
     override val diagnostics: Flow<String> = mutableDiagnostics.asSharedFlow()
 
     init {
@@ -131,7 +129,6 @@ private class DefaultDeviceSession(
     override suspend fun disconnect() {
         trace.log("SESSION", "disconnect")
         commands.cancelAll()
-        if (recordingState.value is RecordingState.Recording) recorder.stop()
         transport.disconnect()
         protocol.reset()
         mutableMetrics.value = null
@@ -142,9 +139,16 @@ private class DefaultDeviceSession(
         return commands.execute(command)
     }
 
-    override suspend fun startRecording(targetPath: String) = recorder.start(targetPath)
+    override suspend fun startRecording(sink: RecorderFrameSink) {
+        recordingSinkMutex.withLock {
+            check(recordingSink == null) { "A recording sink is already active" }
+            recordingSink = sink
+        }
+    }
 
-    override suspend fun stopRecording() = recorder.stop()
+    override suspend fun stopRecording() {
+        recordingSinkMutex.withLock { recordingSink = null }
+    }
 
     override suspend fun close() {
         disconnect()
@@ -152,8 +156,8 @@ private class DefaultDeviceSession(
     }
 
     private suspend fun distribute(frame: RecorderFrame) {
+        recordingSinkMutex.withLock { recordingSink?.append(frame) }
         waveform.accept(frame)
-        if (recorder.state.value is RecordingState.Recording) recorder.append(frame)
         mutableMetrics.value = DeviceMetrics(
             sequence = frame.metadata.sequence,
             skinCelsius = frame.temperature.skinCelsius,
@@ -165,7 +169,7 @@ private class DefaultDeviceSession(
         mutableFrames.emit(frame)
         trace.log(
             "DISPATCH",
-            "seq=${frame.metadata.sequence} -> waveform, metrics, app-flow, file=${recorder.state.value is RecordingState.Recording}",
+            "seq=${frame.metadata.sequence} -> recording-sink, waveform, metrics, app-flow",
         )
     }
 }

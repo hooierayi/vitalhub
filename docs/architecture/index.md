@@ -53,15 +53,16 @@ graph TD
     deviceSdk --> deviceTransport
     deviceSdk --> deviceProtocol[":foundation:device-protocol"]
     deviceSdk --> deviceCommand[":foundation:device-command"]
-    deviceSdk --> deviceStorage[":foundation:device-storage"]
     deviceSdk --> deviceWaveform[":foundation:device-waveform"]
     deviceCommand --> deviceTransport
+    fileProtocol[":foundation:file-protocol"]
     userFeature --> storage[":core:storage"]
     app --> home[":feature:home"]
     app --> userFeature[":feature:user"]
     app --> questionnaire[":feature:questionnaire"]
     app --> collection[":feature:collection"]
     app --> analysis[":feature:analysis"]
+    collection --> fileProtocol
     app -. debug only .-> dokitBluetooth[":debug:dokit-bluetooth"]
     app -. debug only .-> dokitProtocol[":debug:dokit-protocol"]
     app -. debug only .-> dokitWaveform[":debug:dokit-waveform"]
@@ -104,9 +105,10 @@ graph TD
 | `:foundation:device-transport` | Android library | device-api、bluetooth | device-command、device-sdk | 把蓝牙回调适配为字节流及挂起式连接/写入 |
 | `:foundation:device-protocol` | Android library | device-api | device-sdk | 环形缓冲、拦截器拆包、校验、连续性及聚合帧解析 |
 | `:foundation:device-command` | Android library | device-api、device-transport | device-sdk | 有界优先级队列、单飞指令、回执、超时与幂等重试 |
-| `:foundation:device-storage` | Android library | device-api | device-sdk | 解析后聚合帧异步文件记录 |
+| `:foundation:device-storage` | Android library | device-api | 暂无 | 旧版解析后聚合帧文件记录能力；当前 App DICOM 链路不再使用 |
+| `:foundation:file-protocol` | Android library | dcm4che-core | feature:collection | 持续追加采集帧到可恢复 staging，封口或滚动时基于成熟 DICOM core 库生成 `.dcm`，不自研 DICOM 二进制编码 |
 | `:foundation:device-waveform` | Android library | device-api | device-sdk | ECG/呼吸波形投影和慢消费者隔离 |
-| `:foundation:device-sdk` | Android library | bluetooth、全部 device 子模块 | collection | 设备能力总壳、会话生命周期和自动分发 |
+| `:foundation:device-sdk` | Android library | bluetooth、device-api、device-transport、device-protocol、device-command、device-waveform | collection | 设备能力总壳、会话生命周期、可靠记录 Sink 和自动分发 |
 | `:provider:user` | Android library | ARouter API | app、home、collection、analysis、feature:user | 用户资料、指纹及历史关联查询契约的影响面 |
 | `:provider:collection` | Android library | navi、ARouter API | home、questionnaire、collection | 采集流程状态机契约的影响面 |
 | `:provider:device` | Android library | ARouter API、bluetooth | collection、analysis | 最近成功连接设备的 `DeviceInfo`、内部写卡记录及兼容设备对象契约 |
@@ -135,6 +137,7 @@ graph TD
 - `:provider:collection` 是继承 `IProvider` 的采集流程状态机契约层；`:feature:collection` 负责 MMKV 实现及 `/collection/flow/service` 服务注册。
 - `:provider:device` 是继承 `IProvider` 的最近连接设备契约层；Parcelable `DeviceInfo` 保存设备名称、MAC 和可选的设备内部写卡 `DeviceRecordInfo`，并通过 `getRecordInfo()` 单独暴露写卡记录。`:feature:collection` 将其作为单个对象持久化，负责 MMKV 实现及 `/device/service` 服务注册；写入统一使用 `saveDevice(DeviceInfo)`，旧层仅保留设备对象、名称和 MAC 查询接口。
 - `:provider:record` 是继承 `IProvider` 的完成记录契约层；`:feature:collection` 负责 Room 实现及 `/record/service` 服务注册，`:app` 只通过契约查询。
+- `:foundation:file-protocol` 是独立的可交换文件协议基础层；持续写入期间使用带 checkpoint 的可恢复 staging，在封口或达到容量上限时使用 `dcm4che-core` 生成 DICOM Part 10 文件。staging 的恢复信息不进入最终 DICOM。模块不依赖设备链路或业务模块，不引入图像编解码和 DICOM 网络栈；一次连续采集仅在容量滚动时产生同一 Study/Series 下的多个 SOP Instance。
 - feature 模块不直接依赖彼此，使用 ARouter 路径经 `Navigator` 跳转。
 - 三个 `:debug:dokit-*` 模块只消费 foundation 暴露的惰性调试快照，不被业务模块依赖；工具以宿主 Activity 内可拖动的数据卡片展示并保留完整详情页，不申请系统悬浮窗权限。DoKit SDK 只存在于 app debug 运行时，release 不打包悬浮卡片或面板 Activity。
 

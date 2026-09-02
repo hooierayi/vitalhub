@@ -29,6 +29,7 @@ core:navi ◄──────────── app、provider 与所有 featu
 - `foundation:device-command`：有界优先级指令队列、单飞 Worker、编码、回执匹配、超时及幂等重试。
 - `foundation:device-storage`：解析后聚合帧的异步无静默丢帧存储和 `.part` 文件收口。
 - `foundation:device-waveform`：从聚合帧分别投影 `EcgWaveformFrame` / `RespirationWaveformFrame`，并隔离慢 UI 消费者。
+- `foundation:file-protocol`：基于 `dcm4che-core` 的可交换文件协议基础能力，持续接收采集值并在停止或容量滚动时生成 DICOM `.dcm`；不自研 DICOM 二进制编码，也不引入图像编解码或网络栈。片段采集由 `feature:collection` 通过可靠 `RecorderFrameSink` 接入，UI `frames` 流不用于文件落盘。
 - `foundation:device-sdk`：以上能力的总壳和会话编排；业务不负责组装及转发字节流。
 - `provider:user`：用户资料模型和 ARouter Provider 契约。
 - `provider:collection`：首页采集流程检查点、事件与 ARouter Provider 契约。

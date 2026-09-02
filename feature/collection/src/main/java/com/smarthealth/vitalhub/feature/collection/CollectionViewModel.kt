@@ -127,6 +127,14 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         _uiState.value = _uiState.value.copy(startedAt = formatRecordTime(startedAt))
     }
 
+    fun markLocalRecordingFinished(path: String) {
+        savedStateHandle[RECORD_FILE_PATH_KEY] = path
+    }
+
+    fun getOrCreateStudyInstanceUid(createUid: () -> String): String =
+        savedStateHandle.get<String>(STUDY_INSTANCE_UID_KEY)
+            ?: createUid().also { savedStateHandle[STUDY_INSTANCE_UID_KEY] = it }
+
     fun markContinuousRecordingStarted(): Long {
         val startedAt = System.currentTimeMillis()
         savedStateHandle[RECORD_STARTED_AT_KEY] = startedAt
@@ -326,6 +334,7 @@ class CollectionViewModel(private val savedStateHandle: SavedStateHandle) : View
         const val RECORD_ID_KEY = "recordId"
         const val RECORD_STARTED_AT_KEY = "recordStartedAt"
         const val RECORD_FILE_PATH_KEY = "recordFilePath"
+        const val STUDY_INSTANCE_UID_KEY = "studyInstanceUid"
     }
 }
 

@@ -14,6 +14,13 @@ import com.smarthealth.vitalhub.foundation.device.api.DeviceCommand
 import com.smarthealth.vitalhub.foundation.device.sdk.ProtocolByteOrder
 import com.smarthealth.vitalhub.foundation.device.sdk.RecorderDeviceSdk
 import com.smarthealth.vitalhub.foundation.device.sdk.RecorderDeviceSdkConfig
+import com.smarthealth.vitalhub.foundation.device.api.RecorderFrameSink
+import com.smarthealth.vitalhub.foundation.file.protocol.DefaultContinuousDicomWriterFactory
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomPublisher
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomRecordingDefinition
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomRecordingResult
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomWorkspace
+import com.smarthealth.vitalhub.feature.collection.recording.CollectionDicomRecorder
 import com.smarthealth.vitalhub.provider.device.DeviceInfo
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
 import kotlinx.coroutines.channels.Channel
@@ -83,6 +90,7 @@ class CollectionBluetoothProvider(
     private val deviceProvider = checkNotNull(
         ARouter.getInstance().navigation(DeviceProvider::class.java),
     ) { "DeviceProvider is not registered." }
+    private val dicomRecorder = CollectionDicomRecorder(DefaultContinuousDicomWriterFactory())
     private val connectionEvents = Channel<Unit>(Channel.BUFFERED)
     private val mutableConnectionLostEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var scanGeneration = 0
@@ -99,7 +107,6 @@ class CollectionBluetoothProvider(
     val ecgWaveforms = deviceSession.ecgWaveforms
     val respirationWaveforms = deviceSession.respirationWaveforms
     val metrics = deviceSession.metrics
-    val recordingState = deviceSession.recordingState
     val diagnostics = deviceSession.diagnostics
 
     init {
@@ -266,9 +273,34 @@ class CollectionBluetoothProvider(
             )
     }
 
-    suspend fun startRecording(targetPath: String) = deviceSession.startRecording(targetPath)
+    suspend fun startRecording(
+        definition: DicomRecordingDefinition,
+        workspace: DicomWorkspace,
+        publisher: DicomPublisher,
+        maximumFrameCount: Long? = null,
+    ) {
+        require(maximumFrameCount == null || maximumFrameCount > 0) {
+            "maximumFrameCount must be positive when specified"
+        }
+        dicomRecorder.start(definition, workspace, publisher)
+        try {
+            var appendedFrameCount = 0L
+            deviceSession.startRecording(RecorderFrameSink { frame ->
+                if (maximumFrameCount == null || appendedFrameCount < maximumFrameCount) {
+                    dicomRecorder.append(frame)
+                    appendedFrameCount++
+                }
+            })
+        } catch (error: Throwable) {
+            dicomRecorder.abort(retainWorkspace = false)
+            throw error
+        }
+    }
 
-    suspend fun stopRecording() = deviceSession.stopRecording()
+    suspend fun stopRecording(): DicomRecordingResult? {
+        deviceSession.stopRecording()
+        return dicomRecorder.stop()
+    }
 
     @SuppressLint("MissingPermission")
     fun startScan() {
@@ -321,7 +353,11 @@ class CollectionBluetoothProvider(
 
     override fun onCleared() {
         bluetoothKit.stopScan()
-        runBlocking { deviceSession.close() }
+        runBlocking {
+            runCatching { deviceSession.stopRecording() }
+            runCatching { dicomRecorder.abort(retainWorkspace = true) }
+            deviceSession.close()
+        }
         _uiState.value = _uiState.value.copy(
             scanning = false,
             deviceOperation = null,

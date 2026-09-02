@@ -8,8 +8,8 @@
 ```text
 feature:collection
   └─ DeviceSession (device-api)
-       ├─ connect(address) / disconnect / execute / startRecording / stopRecording
-       ├─ metrics / recordingState
+       ├─ connect(address) / disconnect / execute / startRecording(sink) / stopRecording
+       ├─ metrics
        ├─ ecgWaveforms / respirationWaveforms
        └─ frames
 
@@ -17,7 +17,6 @@ device-sdk（会话编排与自动分发）
   ├─ device-transport ──► foundation:bluetooth
   ├─ device-protocol
   ├─ device-command ────► device-transport
-  ├─ device-storage
   └─ device-waveform
 ```
 
@@ -39,7 +38,7 @@ Interceptor Pipeline
   ↓ ProtocolPacket.Data(RecorderFrame)
 DeviceSession.distribute（同一完整帧自动扇出）
   ├─ waveform：分别投影 EcgWaveformFrame / RespirationWaveformFrame；小缓冲、慢 UI 丢最旧帧
-  ├─ storage：RecorderFrame；有界 Channel 反压，不静默丢记录帧
+  ├─ recording sink：RecorderFrame；挂起回调反压，不静默丢记录帧
   ├─ metrics：DeviceMetrics；StateFlow 只保留最新温湿度/导联等状态
   └─ frames：需要完整帧的领域消费者
 ```
@@ -60,13 +59,14 @@ DeviceSession.distribute（同一完整帧自动扇出）
 metadata(sequence, receivedAtMillis, continuity, protocolVersion)
 ecg: IntArray(250)                  // 16 位有符号大端解析结果
 respiration: IntArray(250)          // 24 位有符号大端解析结果
+temperature / humidity              // 16 位有符号大端，解析后乘 0.01
 temperature(skin, ambient, humidity)
 motion: List<MotionSample>(5)       // 每项陀螺仪 XYZ + 加速度 XYZ
 sweatLevel
 leadOff
 ```
 
-ECG、呼吸仍是同一个设备帧中的类型化数据块；存储写入解析后的完整聚合帧并保留设备真实序号。波形模块为 UI 分别投影两个对象和数据流，使两种信号可以独立消费、配置和绘制，二者继续携带相同的设备帧序号与连续性。
+ECG、呼吸仍是同一个设备帧中的类型化数据块；可靠 recording sink 接收解析后的完整聚合帧。波形模块为 UI 分别投影两个对象和数据流，使两种信号可以独立消费、配置和绘制，二者继续携带相同的设备帧序号与连续性。
 
 ## 4. 波形绘制链路
 
@@ -104,9 +104,11 @@ CommandResult.Success / Rejected / Failed
 
 ## 6. 文件链路
 
-`BinaryFrameRecorder` 使用独立写入协程和有界 Channel。`append` 在队列满时产生反压，不会静默丢帧；写入异常只把 `recordingState` 置为 `Failed`，不会终止协议解析和画图。
-
-文件先写 `<target>.part`，正常停止并 flush/close 后才重命名为目标文件。目标文件已存在或残留 `.part` 时拒绝覆盖。当前内部格式以 `VHF + version` 开头，每条记录保存 metadata 和所有聚合块；在服务端文件协议确定前，此格式只作为本地 SDK 版本化容器。
+`:foundation:file-protocol` 的 DICOM 实现不原地扩容最终 `.dcm`。它将聚合帧持续追加到
+内部 staging，采集停止或达到容量阈值后再由 dcm4che 封口为 Raw Data Storage DICOM。
+`:feature:collection` 负责 `RecorderFrame` 到文件协议帧的转换并直接依赖两个基础模块；
+`file-protocol` 不反向依赖 `device-api`。文件记录使用 `RecorderFrameSink` 在 SDK 分发点施加
+反压，不能使用为 UI/调试准备且允许 `DROP_OLDEST` 的 `frames` SharedFlow。
 
 ## 7. 接入前必须确认的设备配置
 

@@ -123,6 +123,7 @@
 | `:foundation:device-command` | 有界优先级队列、单飞指令、回执和超时重试 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-storage` | 解析后聚合帧的异步文件记录 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-waveform` | ECG/呼吸波形投影和慢消费者隔离 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:file-protocol` | 可交换文件协议基础能力，首要方向为 DICOM `.dcm` 生成 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-sdk` | 设备能力总壳、会话编排和自动分发 | 基础层 | 根 `AGENTS.md` |
 | `:provider:user` | 用户资料的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:collection` | 采集流程进度的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |

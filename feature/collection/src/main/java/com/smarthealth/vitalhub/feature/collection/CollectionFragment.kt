@@ -17,6 +17,20 @@ import com.smarthealth.vitalhub.foundation.device.api.CommandResult
 import com.smarthealth.vitalhub.foundation.device.api.ContinuousCollectionSubject
 import com.smarthealth.vitalhub.foundation.device.api.DeviceCommand
 import com.smarthealth.vitalhub.foundation.device.api.FrameContinuity
+import com.smarthealth.vitalhub.foundation.file.protocol.AcquisitionDefinition
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomRecordingDefinition
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomRolloverPolicy
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomWorkspace
+import com.smarthealth.vitalhub.foundation.file.protocol.DicomWriterPolicy
+import com.smarthealth.vitalhub.foundation.file.protocol.EquipmentDefinition
+import com.smarthealth.vitalhub.foundation.file.protocol.LocalFileDicomPublisher
+import com.smarthealth.vitalhub.foundation.file.protocol.PatientDefinition
+import com.smarthealth.vitalhub.foundation.file.protocol.PatientSex
+import com.smarthealth.vitalhub.foundation.file.protocol.PersonName
+import com.smarthealth.vitalhub.foundation.file.protocol.SeriesDefinition
+import com.smarthealth.vitalhub.foundation.file.protocol.StudyDefinition
+import com.smarthealth.vitalhub.foundation.file.protocol.UuidDicomUidGenerator
+import com.smarthealth.vitalhub.foundation.file.protocol.WearableSignalLayout
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowEvent
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
@@ -26,6 +40,9 @@ import com.smarthealth.vitalhub.provider.user.Gender
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import java.io.File
 import java.util.Calendar
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -33,6 +50,7 @@ import kotlinx.coroutines.launch
 class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinationOwner {
     private val viewModel by viewModels<CollectionViewModel>()
     private val collectionBluetoothProvider by activityViewModels<CollectionBluetoothProvider>()
+    private val dicomUidGenerator = UuidDicomUidGenerator()
     override val appBarTitle: String
         get() = when (arguments?.getString(RouteArgs.COLLECTION_MODE)) {
             CollectionMode.CLIP -> "片段采集中"
@@ -280,7 +298,7 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
 
     private fun pauseClipCollection() {
         viewLifecycleOwner.lifecycleScope.launch {
-            runCatching { collectionBluetoothProvider.stopRecording() }
+            runCatching { stopLocalRecording() }
                 .onSuccess { viewModel.stopClipTimer() }
                 .onFailure {
                     viewModel.stopClipTimer()
@@ -296,7 +314,7 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
     ) {
         viewLifecycleOwner.lifecycleScope.launch {
             if (isCollecting) {
-                runCatching { collectionBluetoothProvider.stopRecording() }
+                runCatching { stopLocalRecording() }
                     .onFailure { viewModel.reportDeviceError(it.message ?: "停止本地记录失败") }
                 viewModel.stopClipTimer()
             }
@@ -318,8 +336,66 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         viewLifecycleOwner.lifecycleScope.launch {
             val directory = requireContext().getExternalFilesDir("records")
                 ?: File(requireContext().filesDir, "records")
-            val target = File(directory, "$sessionId-${System.currentTimeMillis()}.vhf")
-            runCatching { collectionBluetoothProvider.startRecording(target.absolutePath) }
+            val user = runCatching {
+                ARouter.getInstance().navigation(UserInfoProvider::class.java)?.getUser()
+            }.getOrNull()
+            val device = resolveDeviceProvider()?.getDeviceInfo()
+            if (user == null || device == null) {
+                viewModel.reportDeviceError("缺少用户或设备信息，无法创建DICOM记录")
+                return@launch
+            }
+            val startedAt = System.currentTimeMillis()
+            val prefix = "${viewModel.uiState.value.recordId}-$startedAt"
+            val target = File(directory, "$prefix-001.dcm")
+            val definition = DicomRecordingDefinition(
+                sessionId = sessionId,
+                patient = PatientDefinition(
+                    patientName = PersonName(familyName = user.name, givenName = null),
+                    patientId = user.fingerprint,
+                    issuerOfPatientId = "VITALHUB",
+                    birthDate = null,
+                    ageYears = user.age,
+                    sex = when (user.gender) {
+                        Gender.MALE -> PatientSex.MALE
+                        Gender.FEMALE -> PatientSex.FEMALE
+                        Gender.UNSPECIFIED -> null
+                    },
+                ),
+                study = StudyDefinition(
+                    studyInstanceUid = viewModel.getOrCreateStudyInstanceUid(
+                        dicomUidGenerator::newStudyInstanceUid,
+                    ),
+                    studyId = viewModel.uiState.value.recordId,
+                    studyDateTimeEpochMillis = startedAt,
+                    accessionNumber = null,
+                ),
+                series = SeriesDefinition(
+                    seriesInstanceUid = dicomUidGenerator.newSeriesInstanceUid(),
+                    seriesNumber = 1,
+                ),
+                equipment = EquipmentDefinition(
+                    manufacturer = device.name.orEmpty(),
+                    modelName = device.address,
+                    serialNumber = null,
+                    softwareVersions = listOf("VitalHub Android/${BuildConfig.COLLECTION_APP_VERSION}"),
+                ),
+                acquisition = AcquisitionDefinition(
+                    startedAtEpochMillis = startedAt,
+                    timezoneOffset = SimpleDateFormat("Z", Locale.US).format(Date(startedAt)),
+                ),
+                signalLayout = WearableSignalLayout(),
+                writerPolicy = DicomWriterPolicy(
+                    rollover = DicomRolloverPolicy(),
+                ),
+            )
+            runCatching {
+                collectionBluetoothProvider.startRecording(
+                    definition = definition,
+                    workspace = DicomWorkspace(File(directory, "$prefix.work")),
+                    publisher = LocalFileDicomPublisher(directory, prefix),
+                    maximumFrameCount = viewModel.uiState.value.clipDurationSeconds,
+                )
+            }
                 .onSuccess {
                     viewModel.markLocalRecordingStarted(target.absolutePath)
                     viewModel.restartClipTimer()
@@ -332,8 +408,13 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
 
     private fun completeClipAndOpenAnalysis(sessionId: String) {
         viewLifecycleOwner.lifecycleScope.launch {
-            runCatching { collectionBluetoothProvider.stopRecording() }
-                .onFailure { viewModel.reportDeviceError(it.message ?: "停止本地记录失败") }
+            val finalized = runCatching { stopLocalRecording() }
+                .onFailure { viewModel.reportDeviceError(it.message ?: "DICOM文件生成失败") }
+                .getOrDefault(false)
+            if (!finalized) {
+                viewModel.reportDeviceError("采集已结束，但DICOM文件生成失败，请重新采集")
+                return@launch
+            }
             if (!saveCompletedRecord()) {
                 viewModel.reportDeviceError("采集已结束，但记录保存失败，请重新采集")
                 return@launch
@@ -367,6 +448,17 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         return runCatching {
             ARouter.getInstance().navigation(RecordProvider::class.java)?.saveRecord(record) == true
         }.getOrDefault(false)
+    }
+
+    private suspend fun stopLocalRecording(): Boolean {
+        val location = collectionBluetoothProvider.stopRecording()
+            ?.segments
+            ?.firstOrNull()
+            ?.publishedFile
+            ?.location
+            ?: return false
+        viewModel.markLocalRecordingFinished(location)
+        return true
     }
 
     private fun saveDeviceRecord(record: DeviceRecordInfo): Boolean {

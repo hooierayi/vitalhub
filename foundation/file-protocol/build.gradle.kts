@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.smarthealth.vitalhub.foundation.device.sdk"
+    namespace = "com.smarthealth.vitalhub.foundation.file.protocol"
     compileSdk = 34
     defaultConfig { minSdk = 24 }
     compileOptions {
@@ -15,11 +15,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":foundation:bluetooth"))
-    implementation(project(":foundation:device-api"))
-    implementation(project(":foundation:device-transport"))
-    implementation(project(":foundation:device-protocol"))
-    implementation(project(":foundation:device-command"))
-    implementation(project(":foundation:device-waveform"))
+    implementation(libs.dcm4che.core)
     implementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.junit)
 }
