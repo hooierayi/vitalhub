@@ -229,8 +229,8 @@ private fun EnvironmentPanel(frame: RecorderFrame?, modifier: Modifier = Modifie
     PreviewDataPanel(
         title = "环境",
         rows = listOf(
-            "湿度" to temperature?.humidityPercent?.formatOneDecimal(),
-            "温度" to temperature?.ambientCelsius?.formatOneDecimal(),
+            "湿度" to temperature?.humidityPercent?.formatSensorHundredths(),
+            "温度" to temperature?.ambientCelsius?.formatSensorHundredths(),
         ),
         units = listOf("%", "℃"),
         modifier = modifier,
@@ -242,7 +242,7 @@ private fun BodyPanel(frame: RecorderFrame?, modifier: Modifier = Modifier) {
     PreviewDataPanel(
         title = "人体",
         rows = listOf(
-            "皮温" to frame?.temperature?.skinCelsius?.formatOneDecimal(),
+            "皮温" to frame?.temperature?.skinCelsius?.formatSensorHundredths(),
             "汗液" to frame?.sweatLevel?.displayName(),
         ),
         units = listOf("℃", ""),
@@ -347,8 +347,6 @@ private fun PreviewPanelHeader(
         }
     }
 }
-
-private fun Double.formatOneDecimal(): String = String.format(java.util.Locale.US, "%.1f", this)
 
 private fun SweatLevel.displayName(): String = when (this) {
     SweatLevel.NONE -> "无"

@@ -109,8 +109,8 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             metrics = deviceMetrics?.let { metrics ->
                 listOf(
                     VitalMetric("帧序号", metrics.sequence.toString(), "seq"),
-                    VitalMetric("皮温", "%.2f".format(metrics.skinCelsius), "℃"),
-                    VitalMetric("湿度", "%.2f".format(metrics.humidityPercent), "%"),
+                    VitalMetric("皮温", metrics.skinCelsius.formatSensorHundredths(), "℃"),
+                    VitalMetric("湿度", metrics.humidityPercent.formatSensorHundredths(), "%"),
                 )
             } ?: state.metrics,
             deviceDebugInfo = when {
