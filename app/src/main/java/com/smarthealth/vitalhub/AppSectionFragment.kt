@@ -19,7 +19,17 @@ class AppSectionFragment : BaseFlowFragment(), BottomNavigationDestination, AppB
     override val showAppBarBack = false
 
     @Composable
-    override fun ScreenContent() = AppSectionScreen(viewModel.uiState.collectAsStateWithLifecycle().value)
+    override fun ScreenContent() = AppSectionScreen(
+        state = viewModel.uiState.collectAsStateWithLifecycle().value,
+        onRecordClick = { recordId ->
+            Navigator.analysis(
+                context = requireContext(),
+                recordId = recordId,
+                entryMode = FlowEntryMode.DIRECT_RETURN_HOME,
+                analysisEntryMode = AnalysisEntryMode.FROM_RECORD,
+            )
+        },
+    )
 
     companion object {
         const val ARG_SECTION = "appBottomSection"

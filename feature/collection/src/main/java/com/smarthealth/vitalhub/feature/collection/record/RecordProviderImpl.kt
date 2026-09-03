@@ -30,6 +30,9 @@ class RecordProviderImpl : RecordProvider {
         .getAll()
         .map(CollectionRecordEntity::toModel)
 
+    override suspend fun getRecordById(recordId: String): CollectionRecord? =
+        requireDatabase().collectionRecordDao().getById(recordId)?.toModel()
+
     override suspend fun getRecordBySessionId(sessionId: String): CollectionRecord? =
         requireDatabase().collectionRecordDao().getBySessionId(sessionId)?.toModel()
 

@@ -53,7 +53,7 @@ class AnalysisFragment : BaseFlowFragment(), AppBarDestination {
                 )
             },
             onPostQuestionnaire = {
-                if (state.canContinueFlow) {
+                if (state.canOpenPostQuestionnaire) {
                     Navigator.flow(
                         context = requireContext(),
                         sessionId = state.sessionId,

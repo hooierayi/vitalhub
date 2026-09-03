@@ -7,11 +7,15 @@ import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
-internal data class AnalysisProgress(val recordId: String, val state: AnalysisTaskState)
+internal data class AnalysisProgress(
+    val recordId: String,
+    val state: AnalysisTaskState,
+    val record: CollectionRecord? = null,
+)
 
 internal interface AnalysisRunner {
     suspend fun execute(
-        sessionId: String,
+        recordId: String,
         action: AnalysisFailureAction? = null,
         onProgress: (AnalysisProgress) -> Unit,
     )
@@ -27,12 +31,19 @@ internal class DefaultAnalysisRepository(
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) : AnalysisRunner {
     override suspend fun execute(
-        sessionId: String,
+        recordId: String,
         action: AnalysisFailureAction?,
         onProgress: (AnalysisProgress) -> Unit,
     ) {
         try {
-            val record = requireRecord(sessionId)
+            val record = requireRecord(recordId)
+            onProgress(
+                AnalysisProgress(
+                    recordId = record.id,
+                    state = AnalysisTaskState.Uploading(0),
+                    record = record,
+                ),
+            )
             val (task, resumedExistingTask) = when (action) {
                 AnalysisFailureAction.RESTART_ANALYSIS,
                 AnalysisFailureAction.RETRY_UPLOAD -> {
@@ -76,7 +87,7 @@ internal class DefaultAnalysisRepository(
         } catch (failure: Throwable) {
             onProgress(
                 AnalysisProgress(
-                    recordProvider.getRecordBySessionId(sessionId)?.id.orEmpty(),
+                    recordId,
                     AnalysisTaskState.Failed(
                         failure.message ?: "上传或分析失败",
                         AnalysisFailureAction.NONE,
@@ -97,7 +108,6 @@ internal class DefaultAnalysisRepository(
             throw AnalysisFailure(record.id, localFileProblem("本地 DICOM 文件不存在"))
         }
 
-        onProgress(AnalysisProgress(record.id, AnalysisTaskState.Uploading(0)))
         var lastProgress = -1
         val result = remoteDataSource.upload(
             file = file,
@@ -217,9 +227,9 @@ internal class DefaultAnalysisRepository(
         }
     }
 
-    private suspend fun requireRecord(sessionId: String): CollectionRecord =
-        recordProvider.getRecordBySessionId(sessionId)
-            ?: throw AnalysisFailure("", localFileProblem("未找到本次采集记录"))
+    private suspend fun requireRecord(recordId: String): CollectionRecord =
+        recordProvider.getRecordById(recordId)
+            ?: throw AnalysisFailure(recordId, localFileProblem("未找到本次采集记录"))
 
     private fun localFileProblem(message: String) = AnalysisProblem(
         phase = AnalysisRequestPhase.UPLOAD,

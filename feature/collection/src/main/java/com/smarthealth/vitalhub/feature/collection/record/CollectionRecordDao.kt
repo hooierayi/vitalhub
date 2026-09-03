@@ -14,6 +14,9 @@ internal interface CollectionRecordDao {
     @Query("SELECT * FROM collection_records ORDER BY recordedAtEpochMillis DESC")
     suspend fun getAll(): List<CollectionRecordEntity>
 
+    @Query("SELECT * FROM collection_records WHERE id = :recordId LIMIT 1")
+    suspend fun getById(recordId: String): CollectionRecordEntity?
+
     @Query(
         "SELECT * FROM collection_records WHERE sessionId = :sessionId " +
             "ORDER BY recordedAtEpochMillis DESC LIMIT 1",

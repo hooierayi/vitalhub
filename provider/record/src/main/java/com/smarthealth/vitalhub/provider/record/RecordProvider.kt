@@ -10,6 +10,9 @@ interface RecordProvider : IProvider {
 
     suspend fun getAllRecords(): List<CollectionRecord>
 
+    /** Returns the exact record identified by its local primary key. */
+    suspend fun getRecordById(recordId: String): CollectionRecord?
+
     suspend fun getRecordBySessionId(sessionId: String): CollectionRecord?
 
     /** Inserts or replaces the record identified by [CollectionRecord.id]. */

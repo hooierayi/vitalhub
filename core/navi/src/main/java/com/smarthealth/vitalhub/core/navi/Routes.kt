@@ -21,15 +21,22 @@ object Routes {
 
 object RouteArgs {
     const val SESSION_ID = "sessionId"
+    const val RECORD_ID = "recordId"
     const val QUESTIONNAIRE_PHASE = "questionnairePhase"
     const val COLLECTION_MODE = "collectionMode"
     const val FLOW_DESTINATION = "flowDestination"
     const val FLOW_ENTRY_MODE = "flowEntryMode"
+    const val ANALYSIS_ENTRY_MODE = "analysisEntryMode"
 }
 
 object FlowEntryMode {
     const val SEQUENTIAL = "sequential"
     const val DIRECT_RETURN_HOME = "directReturnHome"
+}
+
+object AnalysisEntryMode {
+    const val FROM_COLLECTION = "fromCollection"
+    const val FROM_RECORD = "fromRecord"
 }
 
 object QuestionnairePhase {

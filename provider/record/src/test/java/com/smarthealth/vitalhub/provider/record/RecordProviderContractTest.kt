@@ -31,8 +31,20 @@ class RecordProviderContractTest {
 
         assertEquals(
             "analysis-1",
-            provider.getRecordBySessionId(record.sessionId)?.analysisId,
+            provider.getRecordById(record.id)?.analysisId,
         )
+    }
+
+    @Test
+    fun `record id selects one record when a session contains multiple records`() = runBlocking {
+        val provider = FakeRecordProvider()
+        val first = record("record-1", completedAt = 100L)
+        val second = record("record-2", completedAt = 200L).copy(sessionId = first.sessionId)
+        provider.saveRecord(first)
+        provider.saveRecord(second)
+
+        assertEquals(first, provider.getRecordById(first.id))
+        assertEquals(second, provider.getRecordById(second.id))
     }
 
     private fun record(id: String, completedAt: Long) = CollectionRecord(
@@ -55,6 +67,9 @@ private class FakeRecordProvider : RecordProvider {
     override fun observeAllRecords(): Flow<List<CollectionRecord>> = records
 
     override suspend fun getAllRecords(): List<CollectionRecord> = records.value
+
+    override suspend fun getRecordById(recordId: String): CollectionRecord? =
+        records.value.firstOrNull { it.id == recordId }
 
     override suspend fun getRecordBySessionId(sessionId: String): CollectionRecord? =
         records.value.firstOrNull { it.sessionId == sessionId }

@@ -2,6 +2,7 @@ package com.smarthealth.vitalhub.feature.analysis
 
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
+import com.smarthealth.vitalhub.core.navi.AnalysisEntryMode
 import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisProgress
@@ -9,10 +10,11 @@ import com.smarthealth.vitalhub.feature.analysis.data.AnalysisRunner
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisFailureAction
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisTaskState
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisWaitingStatus
-import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKitDevice
-import com.smarthealth.vitalhub.provider.device.DeviceInfo
-import com.smarthealth.vitalhub.provider.device.DeviceProvider
-import com.smarthealth.vitalhub.provider.device.DeviceRecordInfo
+import com.smarthealth.vitalhub.provider.record.CollectionRecord
+import com.smarthealth.vitalhub.provider.record.RecordType
+import com.smarthealth.vitalhub.provider.user.Gender
+import com.smarthealth.vitalhub.provider.user.UserInfo
+import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -48,12 +50,19 @@ class AnalysisViewModelTest {
     fun `real process maps upload analysis and completed result`() = runTest(dispatcher) {
         val runner = FakeAnalysisRunner()
         val viewModel = AnalysisViewModel(
-            savedStateHandle = SavedStateHandle(mapOf(RouteArgs.SESSION_ID to "session")),
+            savedStateHandle = SavedStateHandle(
+                mapOf(RouteArgs.RECORD_ID to "CLIP-1"),
+            ),
             analysisRunner = runner,
+            userInfoProvider = FakeUserInfoProvider,
         )
         runCurrent()
 
         assertEquals(AnalysisTaskState.Uploading(40), viewModel.uiState.value.process)
+        assertEquals("session-1", viewModel.uiState.value.sessionId)
+        assertEquals("AA:BB", viewModel.uiState.value.deviceAddress)
+        assertEquals("测试用户", viewModel.uiState.value.collectorName)
+        assertTrue(viewModel.uiState.value.collectionCompletedAt != "-")
         assertFalse(viewModel.uiState.value.canLeavePage)
         assertFalse(viewModel.uiState.value.canContinueFlow)
 
@@ -136,39 +145,84 @@ class AnalysisViewModelTest {
         val viewModel = AnalysisViewModel(
             savedStateHandle = SavedStateHandle(
                 mapOf(
-                    RouteArgs.SESSION_ID to "session",
+                    RouteArgs.RECORD_ID to "CLIP-1",
                     RouteArgs.FLOW_ENTRY_MODE to FlowEntryMode.DIRECT_RETURN_HOME,
+                    RouteArgs.ANALYSIS_ENTRY_MODE to AnalysisEntryMode.FROM_COLLECTION,
                 ),
             ),
             analysisRunner = IdleAnalysisRunner,
         )
 
         assertEquals(FlowEntryMode.DIRECT_RETURN_HOME, viewModel.uiState.value.flowEntryMode)
+        assertFalse(viewModel.uiState.value.usesDirectHomeAction)
+        assertFalse(viewModel.uiState.value.canOpenPostQuestionnaire)
     }
 
     @Test
-    fun `collection device displays mac address even when device has a name`() {
-        val provider = FakeDeviceProvider(
-            DeviceInfo(address = "AA:BB:CC:DD:EE:FF", name = "VitalHub Recorder"),
+    fun `collection entry offers questionnaire after analysis is accepted`() {
+        val state = AnalysisUiState(
+            sessionId = "session",
+            flowEntryMode = FlowEntryMode.DIRECT_RETURN_HOME,
+            analysisEntryMode = AnalysisEntryMode.FROM_COLLECTION,
+            process = AnalysisTaskState.Waiting(AnalysisWaitingStatus.PROCESSING),
+            collectionCompletedAt = "-",
+            deviceAddress = "-",
+            collectorName = "-",
         )
 
-        assertEquals("AA:BB:CC:DD:EE:FF", resolveDeviceAddress(provider))
+        assertTrue(state.canOpenPostQuestionnaire)
+        assertFalse(state.usesDirectHomeAction)
     }
 
     @Test
-    fun `collection device displays placeholder when mac address is blank`() {
-        val provider = FakeDeviceProvider(DeviceInfo(address = "", name = "VitalHub Recorder"))
+    fun `record entry uses full width home after analysis is accepted`() {
+        val state = AnalysisUiState(
+            sessionId = "session",
+            flowEntryMode = FlowEntryMode.DIRECT_RETURN_HOME,
+            analysisEntryMode = AnalysisEntryMode.FROM_RECORD,
+            process = AnalysisTaskState.Waiting(AnalysisWaitingStatus.PROCESSING),
+            collectionCompletedAt = "-",
+            deviceAddress = "-",
+            collectorName = "-",
+        )
 
-        assertEquals("-", resolveDeviceAddress(provider))
+        assertFalse(state.canOpenPostQuestionnaire)
+        assertTrue(state.usesDirectHomeAction)
+    }
+
+    @Test
+    fun `direct entry keeps recovery action beside home after failure`() {
+        val state = AnalysisUiState(
+            sessionId = "session",
+            flowEntryMode = FlowEntryMode.DIRECT_RETURN_HOME,
+            analysisEntryMode = AnalysisEntryMode.FROM_RECORD,
+            process = AnalysisTaskState.Failed(
+                "失败",
+                AnalysisFailureAction.RESUME_QUERY,
+            ),
+            collectionCompletedAt = "-",
+            deviceAddress = "-",
+            collectorName = "-",
+        )
+
+        assertFalse(state.usesDirectHomeAction)
+        assertFalse(state.canOpenPostQuestionnaire)
+        assertTrue(state.canRetryProcess)
     }
 
     private class FakeAnalysisRunner : AnalysisRunner {
         override suspend fun execute(
-            sessionId: String,
+            recordId: String,
             action: AnalysisFailureAction?,
             onProgress: (AnalysisProgress) -> Unit,
         ) {
-            onProgress(AnalysisProgress("CLIP-1", AnalysisTaskState.Uploading(40)))
+            onProgress(
+                AnalysisProgress(
+                    recordId = RECORD.id,
+                    state = AnalysisTaskState.Uploading(40),
+                    record = RECORD,
+                ),
+            )
             delay(100L)
             onProgress(
                 AnalysisProgress(
@@ -188,19 +242,31 @@ class AnalysisViewModelTest {
 
     private object IdleAnalysisRunner : AnalysisRunner {
         override suspend fun execute(
-            sessionId: String,
+            recordId: String,
             action: AnalysisFailureAction?,
             onProgress: (AnalysisProgress) -> Unit,
         ) = Unit
     }
 
-    private class FakeDeviceProvider(private val deviceInfo: DeviceInfo?) : DeviceProvider {
+    private object FakeUserInfoProvider : UserInfoProvider {
         override fun init(context: Context?) = Unit
-        override fun getDeviceInfo(): DeviceInfo? = deviceInfo
-        override fun getRecordInfo(): DeviceRecordInfo? = deviceInfo?.record
-        override fun saveDevice(deviceInfo: DeviceInfo): Boolean = false
-        override fun getCurrentDevice(): BluetoothKitDevice? = null
-        override fun getCurrentDeviceAddress(): String? = deviceInfo?.address
-        override fun getCurrentDeviceName(): String? = deviceInfo?.name
+        override fun getUser(): UserInfo = USER
+        override fun getUser(fingerprint: String): UserInfo? =
+            USER.takeIf { fingerprint == RECORD.userFingerprint }
+        override suspend fun saveUser(user: UserInfo): Boolean = false
+    }
+
+    private companion object {
+        val USER = UserInfo("测试用户", Gender.UNSPECIFIED, 30)
+        val RECORD = CollectionRecord(
+            id = "CLIP-1",
+            sessionId = "session-1",
+            type = RecordType.CLIP,
+            recordedAtEpochMillis = 1_000L,
+            durationMillis = 10_000L,
+            localFilePath = "/records/clip-1.dcm",
+            userFingerprint = USER.fingerprint,
+            deviceAddress = "AA:BB",
+        )
     }
 }

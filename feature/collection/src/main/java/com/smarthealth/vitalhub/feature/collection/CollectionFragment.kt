@@ -120,7 +120,10 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         LaunchedEffect(state.clipCountdownFinished) {
             if (state.clipCountdownFinished) {
                 viewModel.consumeClipCountdownFinished()
-                completeClipAndOpenAnalysis(state.sessionId)
+                completeClipAndOpenAnalysis(
+                    recordId = state.recordId,
+                    sessionId = state.sessionId,
+                )
             }
         }
         val displayState = state.copy(
@@ -406,7 +409,7 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
         }
     }
 
-    private fun completeClipAndOpenAnalysis(sessionId: String) {
+    private fun completeClipAndOpenAnalysis(recordId: String, sessionId: String) {
         viewLifecycleOwner.lifecycleScope.launch {
             val finalized = runCatching { stopLocalRecording() }
                 .onFailure { viewModel.reportDeviceError(it.message ?: "DICOM文件生成失败") }
@@ -425,8 +428,9 @@ class CollectionFragment : BaseFlowFragment(), AppBarDestination, FlowDestinatio
             }
             Navigator.analysis(
                 context = requireContext(),
-                sessionId = sessionId,
+                recordId = recordId,
                 entryMode = flowEntryMode,
+                analysisEntryMode = AnalysisEntryMode.FROM_COLLECTION,
                 finishSourceOnArrival = true,
             )
 

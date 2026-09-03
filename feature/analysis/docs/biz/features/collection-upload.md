@@ -2,14 +2,14 @@
 
 ## 入口与状态
 
-- 片段采集倒计时完成后，`:feature:collection` 通过 `Navigator.analysis(...)` 打开 `AnalysisActivity`，并传入本次采集的 `sessionId`。
+- 片段采集倒计时完成后，`:feature:collection` 通过 `Navigator.analysis(...)` 打开 `AnalysisActivity`，只传入本次采集的唯一 `recordId`。
 - `AnalysisFragment` 按“上传与分析状态、本次记录信息、关键指标趋势”的顺序展示页面内容。
 - 页面标题沿用“AI分析结果”。
-- 本次记录信息不使用演示值：采集日期读取当前 `sessionId` 在 `CollectionFlowProvider` 中保存的首次采集完成时间，采集设备展示 `DeviceProvider` 中最近成功连接设备的 MAC 地址，采集人读取 `UserInfoProvider` 中的当前用户；真实数据缺失时显示“-”。
+- 本次记录信息不使用当前流程或设备的瞬态值：采集日期和设备地址直接读取 `recordId` 对应的 Record，采集人根据 Record 保存的用户指纹查询历史用户资料；真实数据缺失时显示“-”。
 
 ## 上传与分析流程
 
-- 页面通过 `RecordProvider.getRecordBySessionId(sessionId)` 获取已完成片段的本地 `.dcm` 路径，不通过路由参数转发可恢复数据。
+- 页面通过 `RecordProvider.getRecordById(recordId)` 精确获取完整记录、本地 `.dcm` 路径和 `analysisId`；即使同一个 `sessionId` 下发生多次采集，也不会读取到另一条记录。页面展示的记录编号、完成时间、设备地址、采集人，以及后问卷和重新采集所需的 `sessionId`，均从这条 Record 恢复。
 - `:feature:analysis` 使用 `:core:network` 创建固定 Retrofit/OkHttp 客户端；Release base URL 由 `analysisBaseUrl` 注入，默认为 `https://app.friendshipoffice.xyz/`；Debug base URL 由 `analysisDebugBaseUrl` 注入，默认为 `http://47.98.175.38:8000/`。API Key 和 App 版本分别由 `analysisApiKey` 与 `versionName` Gradle 属性注入。API Key 缺失时不发起匿名请求，而是进入不可重试的服务配置失败态。
 - 上传严格按接口约定发送 `data`、`app_version`、`protocol_version` 三个 multipart 字段，文件媒体类型为 `application/dicom`，认证请求头为 `X-API-Key`。
 - Retrofit 保留原始 HTTP 状态：先按 `2xx`、`4xx`、`5xx` 判断请求结果大类，再使用统一 `AnalysisBusinessCode` 细分业务语义。上传与查询共用业务码定义，但分别映射为各自的领域结果；非 `2xx` 不因响应体中的业务码被误判为成功。
@@ -112,6 +112,7 @@
 
 - “回首页”是左侧低强调操作，首页图标位于文字上方；点击后结束 `AnalysisActivity`，恢复返回栈中的首页。
 - “填写采集后问卷”是右侧主操作；通过 `Navigator.flow(...)` 和 `FlowDestination.POST_QUESTIONNAIRE` 打开后问卷，并继续传递当前 `sessionId`。
+- 分析页使用独立的 `analysisEntryMode` 区分来源，不复用控制流程返回方式的 `flowEntryMode`。采集完成进入时使用 `FROM_COLLECTION`，页面首屏即固定展示左侧“回首页”和右侧“填写采集后问卷”；上传完成并取得 `analysisId` 前按钮保持禁用，服务端受理后启用。首页记录卡片进入时使用 `FROM_RECORD`，上传成功受理、排队、分析中和完成态不显示后问卷入口，底部改为全宽“回首页”，上传阶段显示全宽禁用的“上传中”。失败态仍显示左侧“回首页”和右侧恢复操作。
 - 后问卷到达后移除 `AnalysisActivity`，避免提交或返回时重新落到上传页；后问卷提交完成后恢复首页。
 
 ## 返回策略

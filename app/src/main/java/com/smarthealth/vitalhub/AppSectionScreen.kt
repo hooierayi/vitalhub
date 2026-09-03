@@ -2,6 +2,7 @@ package com.smarthealth.vitalhub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,7 +42,10 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun AppSectionScreen(state: AppSectionUiState) {
+fun AppSectionScreen(
+    state: AppSectionUiState,
+    onRecordClick: (recordId: String) -> Unit,
+) {
     FlowPage(scrollable = false, navigationSafe = false, bottomBarSafe = true) {
         SectionTitle(
             text = state.section,
@@ -75,6 +80,7 @@ fun AppSectionScreen(state: AppSectionUiState) {
                         CollectionRecordCard(
                             type = record.type,
                             recordId = record.id,
+                            onClick = { onRecordClick(record.id) },
                             recordedAtEpochMillis = record.recordedAtEpochMillis,
                             durationMillis = record.durationMillis,
                             userName = state.userNamesByFingerprint[record.userFingerprint],
@@ -99,6 +105,7 @@ private fun RecordMessageCard(message: String, color: androidx.compose.ui.graphi
 private fun CollectionRecordCard(
     type: RecordType,
     recordId: String,
+    onClick: () -> Unit,
     recordedAtEpochMillis: Long,
     durationMillis: Long,
     userName: String?,
@@ -111,6 +118,7 @@ private fun CollectionRecordCard(
         formatRecordDuration(durationMillis)
     }
     InfoCard(
+        modifier = Modifier.clickable(role = Role.Button, onClick = onClick),
         padding = PaddingValues(18.dp),
         spacing = 0.dp,
     ) {

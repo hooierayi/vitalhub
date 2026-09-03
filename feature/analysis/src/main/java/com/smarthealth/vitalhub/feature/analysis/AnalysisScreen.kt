@@ -409,6 +409,17 @@ private fun AnalysisActions(
 ) {
     val uploading = state.process is AnalysisTaskState.Uploading
     val failure = state.process as? AnalysisTaskState.Failed
+    if (state.usesDirectHomeAction) {
+        FlowButton(
+            label = if (uploading) "上传中" else "回首页",
+            style = FlowButtonStyle.PRIMARY,
+            modifier = modifier.fillMaxWidth().height(57.dp),
+            onClick = onHome,
+            enabled = state.canLeavePage,
+            loading = uploading,
+        )
+        return
+    }
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -437,7 +448,6 @@ private fun AnalysisActions(
         }
         FlowButton(
             label = when {
-                uploading -> "上传中"
                 failure != null -> failure.action.actionLabel()
                 else -> "填写采集后问卷"
             },
@@ -452,8 +462,10 @@ private fun AnalysisActions(
                 failure != null -> onRetry
                 else -> onPostQuestionnaire
             },
-            enabled = state.canContinueFlow || state.canRetryProcess || state.canRecollectData,
-            loading = uploading,
+            enabled = state.canOpenPostQuestionnaire ||
+                state.canRetryProcess ||
+                state.canRecollectData,
+            loading = false,
         )
     }
 }

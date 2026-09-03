@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import com.smarthealth.vitalhub.core.navi.AnalysisEntryMode
 import com.smarthealth.vitalhub.core.navi.CollectionMode
 import com.smarthealth.vitalhub.core.navi.FlowDestination
 import com.smarthealth.vitalhub.core.navi.FlowDestinationOwner
@@ -31,6 +32,24 @@ import org.junit.runner.RunWith
 /** Exercises the Activity-owned ARouter Fragment flow, transaction gate, and back stack. */
 @RunWith(AndroidJUnit4::class)
 class FlowNavigationInstrumentedTest {
+    @Test
+    fun analysis_route_uses_record_id_and_opens_analysis_fragment() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            val main = waitForResumedActivity(MainActivity::class.java)
+            runOnMain {
+                Navigator.analysis(
+                    main,
+                    "record-1",
+                    analysisEntryMode = AnalysisEntryMode.FROM_RECORD,
+                )
+            }
+            finishFeatureAndReturnHome(
+                activity = waitForResumedActivity(AnalysisActivity::class.java),
+                expectedFragment = "AnalysisFragment",
+            )
+        }
+    }
+
     @Test
     fun home_routes_to_each_feature_activity_and_arouter_fragment() {
         grantCollectionPermission()
@@ -61,7 +80,7 @@ class FlowNavigationInstrumentedTest {
             )
 
             main = waitForResumedActivity(MainActivity::class.java)
-            runOnMain { Navigator.analysis(main, sessionId) }
+            runOnMain { Navigator.analysis(main, "record-1") }
             finishFeatureAndReturnHome(
                 activity = waitForResumedActivity(AnalysisActivity::class.java),
                 expectedFragment = "AnalysisFragment",

@@ -28,7 +28,7 @@ class AnalysisRepositoryTest {
         val repository = repository(provider, remote)
         val progress = mutableListOf<AnalysisProgress>()
 
-        repository.execute("session-1", onProgress = progress::add)
+        repository.execute("CLIP-1", onProgress = progress::add)
 
         assertEquals(1, remote.uploadCount)
         assertEquals("A1", provider.record.analysisId)
@@ -53,11 +53,12 @@ class AnalysisRepositoryTest {
         )
         val progress = mutableListOf<AnalysisProgress>()
 
-        repository(provider, remote).execute("session-1", onProgress = progress::add)
+        repository(provider, remote).execute("CLIP-1", onProgress = progress::add)
 
         assertEquals(0, remote.uploadCount)
         assertEquals(
             listOf(
+                AnalysisTaskState.Uploading(0),
                 AnalysisTaskState.Waiting(AnalysisWaitingStatus.PROCESSING),
                 AnalysisTaskState.Completed("done"),
             ),
@@ -81,7 +82,7 @@ class AnalysisRepositoryTest {
             sleep = delays::add,
         )
 
-        repository.execute("session-1", onProgress = {})
+        repository.execute("CLIP-1", onProgress = {})
 
         assertEquals(listOf(10_000L, 10_000L), delays)
     }
@@ -107,7 +108,7 @@ class AnalysisRepositoryTest {
             sleep = delays::add,
         )
 
-        repository.execute("session-1", onProgress = {})
+        repository.execute("CLIP-1", onProgress = {})
 
         assertEquals(listOf(5_000L, 7_000L, 10_000L), delays)
     }
@@ -120,7 +121,7 @@ class AnalysisRepositoryTest {
         )
 
         repository(provider, remote).execute(
-            "session-1",
+            "CLIP-1",
             action = AnalysisFailureAction.RESUME_QUERY,
             onProgress = {},
         )
@@ -138,7 +139,7 @@ class AnalysisRepositoryTest {
         )
         val progress = mutableListOf<AnalysisProgress>()
 
-        repository(provider, remote).execute("session-1", onProgress = progress::add)
+        repository(provider, remote).execute("CLIP-1", onProgress = progress::add)
 
         assertEquals("A1", provider.record.analysisId)
         val failed = progress.last().state as AnalysisTaskState.Failed
@@ -153,7 +154,7 @@ class AnalysisRepositoryTest {
         )
 
         repository(provider, remote).execute(
-            "session-1",
+            "CLIP-1",
             action = AnalysisFailureAction.RESTART_ANALYSIS,
             onProgress = {},
         )
@@ -246,6 +247,8 @@ class AnalysisRepositoryTest {
         override fun init(context: Context) = Unit
         override fun observeAllRecords(): Flow<List<CollectionRecord>> = records
         override suspend fun getAllRecords(): List<CollectionRecord> = records.value
+        override suspend fun getRecordById(recordId: String): CollectionRecord? =
+            record.takeIf { it.id == recordId }
         override suspend fun getRecordBySessionId(sessionId: String): CollectionRecord? =
             record.takeIf { it.sessionId == sessionId }
 
