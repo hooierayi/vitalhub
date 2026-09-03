@@ -20,12 +20,16 @@ internal data class CreateAnalysisData(
     @SerializedName("session_id") val sessionId: String?,
     @SerializedName("analysis_id") val analysisId: String?,
     val status: String?,
+    @SerializedName("study_instance_uid") val studyInstanceUid: String? = null,
+    @SerializedName("algorithm_version") val algorithmVersion: String? = null,
+    @SerializedName("poll_interval_secs") val pollIntervalSecs: Long? = null,
 )
 
 internal data class AnalysisResultData(
     @SerializedName("analysis_id") val analysisId: String?,
     val status: String?,
     val result: String?,
+    @SerializedName("poll_interval_secs") val pollIntervalSecs: Long? = null,
 )
 
 internal interface AnalysisApi {

@@ -44,6 +44,14 @@ class AnalysisFragment : BaseFlowFragment(), AppBarDestination {
             state = state,
             onHome = { Navigator.returnHome(requireContext()) },
             onRetry = viewModel::retryProcess,
+            onRecollect = {
+                Navigator.flow(
+                    context = requireContext(),
+                    sessionId = state.sessionId,
+                    destination = FlowDestination.CLIP_COLLECTION,
+                    entryMode = state.flowEntryMode,
+                )
+            },
             onPostQuestionnaire = {
                 if (state.canContinueFlow) {
                     Navigator.flow(

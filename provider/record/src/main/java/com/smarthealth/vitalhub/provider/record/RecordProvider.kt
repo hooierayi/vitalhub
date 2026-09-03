@@ -15,8 +15,8 @@ interface RecordProvider : IProvider {
     /** Inserts or replaces the record identified by [CollectionRecord.id]. */
     suspend fun saveRecord(record: CollectionRecord): Boolean
 
-    /** Persists the latest server-side upload/analysis state for a completed record. */
-    suspend fun saveAnalysis(recordId: String, analysis: CollectionAnalysis): Boolean
+    /** Persists only the server task id; remote status remains the source of truth. */
+    suspend fun saveAnalysisId(recordId: String, analysisId: String?): Boolean
 }
 
 data class CollectionRecord(
@@ -28,26 +28,8 @@ data class CollectionRecord(
     val localFilePath: String?,
     val userFingerprint: String,
     val deviceAddress: String,
-    val analysis: CollectionAnalysis? = null,
+    val analysisId: String? = null,
 )
-
-data class CollectionAnalysis(
-    val analysisId: String?,
-    val status: AnalysisStatus,
-    val resultMarkdown: String? = null,
-    val errorCode: Int? = null,
-    val errorMessage: String? = null,
-    val updatedAtEpochMillis: Long,
-)
-
-enum class AnalysisStatus {
-    UPLOADING,
-    QUEUED,
-    PROCESSING,
-    RETRYING,
-    COMPLETED,
-    FAILED,
-}
 
 enum class RecordType {
     CLIP,

@@ -47,6 +47,9 @@ import com.smarthealth.vitalhub.core.ui.FlowButton
 import com.smarthealth.vitalhub.core.ui.FlowButtonStyle
 import com.smarthealth.vitalhub.core.ui.ProgressTrack
 import com.smarthealth.vitalhub.core.ui.VitalColors
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisFailureAction
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisTaskState
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisWaitingStatus
 
 private val AnalysisCardShape = RoundedCornerShape(10.dp)
 private val AnalysisCardBorder = Color(0xFFD7E1E7)
@@ -55,10 +58,11 @@ private val AnalysisMintSurface = Color(0xFFF1F9F6)
 private val RecordIconColor = Color(0xFF2E8FF4)
 
 @Composable
-fun AnalysisScreen(
+internal fun AnalysisScreen(
     state: AnalysisUiState,
     onHome: () -> Unit,
     onRetry: () -> Unit,
+    onRecollect: () -> Unit,
     onPostQuestionnaire: () -> Unit,
 ) {
     Surface(color = VitalColors.Background, modifier = Modifier.fillMaxSize()) {
@@ -84,6 +88,7 @@ fun AnalysisScreen(
                         .padding(horizontal = 18.dp, vertical = 12.dp),
                     onHome = onHome,
                     onRetry = onRetry,
+                    onRecollect = onRecollect,
                     onPostQuestionnaire = onPostQuestionnaire,
                     state = state,
                 )
@@ -175,18 +180,19 @@ private data class ProcessVisual(
     val borderColor: Color,
 )
 
-private fun processVisual(state: AnalysisUiState): ProcessVisual = when (state.processStage) {
-    AnalysisProcessStage.UPLOADING -> ProcessVisual(
+private fun processVisual(state: AnalysisUiState): ProcessVisual = when (val process = state.process) {
+    is AnalysisTaskState.Uploading -> ProcessVisual(
         title = "采集数据上传中",
-        statusText = "${state.uploadProgress}%",
+        statusText = "${process.progress}%",
         description = "正在上传采集数据，请稍候",
-        progress = state.uploadProgress / 100f,
+        progress = process.progress / 100f,
         icon = Icons.Default.CloudUpload,
         accentColor = VitalColors.Teal,
         surfaceColor = AnalysisMintSurface,
         borderColor = AnalysisMintBorder,
     )
-    AnalysisProcessStage.QUEUED -> ProcessVisual(
+    is AnalysisTaskState.Waiting -> when (process.status) {
+        AnalysisWaitingStatus.QUEUED -> ProcessVisual(
         title = "上传完成，等待分析",
         statusText = "排队中",
         description = "分析任务已进入服务器队列",
@@ -195,8 +201,8 @@ private fun processVisual(state: AnalysisUiState): ProcessVisual = when (state.p
         accentColor = VitalColors.Blue,
         surfaceColor = Color(0xFFF3F7FD),
         borderColor = Color(0xFFC9DCF7),
-    )
-    AnalysisProcessStage.ANALYZING -> ProcessVisual(
+        )
+        AnalysisWaitingStatus.PROCESSING -> ProcessVisual(
         title = "上传完成，分析中",
         statusText = "分析中",
         description = "服务器正在分析采集数据",
@@ -205,18 +211,19 @@ private fun processVisual(state: AnalysisUiState): ProcessVisual = when (state.p
         accentColor = VitalColors.Blue,
         surfaceColor = Color(0xFFF3F7FD),
         borderColor = Color(0xFFC9DCF7),
-    )
-    AnalysisProcessStage.RETRYING -> ProcessVisual(
+        )
+        AnalysisWaitingStatus.RETRYING -> ProcessVisual(
         title = "上传完成，分析重试中",
         statusText = "重试中",
-        description = "服务器正在重新执行分析任务",
+        description = process.message ?: "服务器正在重新执行分析任务",
         progress = 1f,
         icon = Icons.Default.QueryStats,
         accentColor = VitalColors.Blue,
         surfaceColor = Color(0xFFF3F7FD),
         borderColor = Color(0xFFC9DCF7),
-    )
-    AnalysisProcessStage.COMPLETED -> ProcessVisual(
+        )
+    }
+    is AnalysisTaskState.Completed -> ProcessVisual(
         title = "上传与分析完成",
         statusText = "100%",
         description = "服务器已返回分析结果",
@@ -226,11 +233,11 @@ private fun processVisual(state: AnalysisUiState): ProcessVisual = when (state.p
         surfaceColor = AnalysisMintSurface,
         borderColor = AnalysisMintBorder,
     )
-    AnalysisProcessStage.FAILED -> ProcessVisual(
+    is AnalysisTaskState.Failed -> ProcessVisual(
         title = "上传或分析失败",
         statusText = "失败",
-        description = state.processError ?: "请检查网络后重试",
-        progress = state.uploadProgress / 100f,
+        description = process.message,
+        progress = 0f,
         icon = Icons.Default.Error,
         accentColor = VitalColors.Danger,
         surfaceColor = Color(0xFFFFF4F3),
@@ -329,11 +336,12 @@ private fun AnalysisActions(
     modifier: Modifier = Modifier,
     onHome: () -> Unit,
     onRetry: () -> Unit,
+    onRecollect: () -> Unit,
     onPostQuestionnaire: () -> Unit,
     state: AnalysisUiState,
 ) {
-    val uploading = state.processStage == AnalysisProcessStage.UPLOADING
-    val failed = state.processStage == AnalysisProcessStage.FAILED
+    val uploading = state.process is AnalysisTaskState.Uploading
+    val failure = state.process as? AnalysisTaskState.Failed
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -363,14 +371,30 @@ private fun AnalysisActions(
         FlowButton(
             label = when {
                 uploading -> "上传中"
-                failed -> "重新上传"
+                failure != null -> failure.action.actionLabel()
                 else -> "填写采集后问卷"
             },
-            style = FlowButtonStyle.PRIMARY,
+            style = if (failure?.action == AnalysisFailureAction.NONE) {
+                FlowButtonStyle.DANGER
+            } else {
+                FlowButtonStyle.PRIMARY
+            },
             modifier = Modifier.weight(1f).height(57.dp),
-            onClick = if (failed) onRetry else onPostQuestionnaire,
-            enabled = state.canContinueFlow || failed,
+            onClick = when {
+                state.canRecollectData -> onRecollect
+                failure != null -> onRetry
+                else -> onPostQuestionnaire
+            },
+            enabled = state.canContinueFlow || state.canRetryProcess || state.canRecollectData,
             loading = uploading,
         )
     }
+}
+
+private fun AnalysisFailureAction.actionLabel(): String = when (this) {
+    AnalysisFailureAction.RETRY_UPLOAD -> "重新上传"
+    AnalysisFailureAction.RESUME_QUERY -> "继续查询"
+    AnalysisFailureAction.RESTART_ANALYSIS -> "重新分析"
+    AnalysisFailureAction.RECOLLECT_DATA -> "重新采集"
+    AnalysisFailureAction.NONE -> "服务异常"
 }

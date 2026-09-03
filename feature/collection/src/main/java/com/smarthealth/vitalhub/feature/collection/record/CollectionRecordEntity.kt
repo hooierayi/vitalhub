@@ -3,8 +3,6 @@ package com.smarthealth.vitalhub.feature.collection.record
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.smarthealth.vitalhub.provider.record.AnalysisStatus
-import com.smarthealth.vitalhub.provider.record.CollectionAnalysis
 import com.smarthealth.vitalhub.provider.record.CollectionRecord
 import com.smarthealth.vitalhub.provider.record.RecordType
 
@@ -27,11 +25,6 @@ internal data class CollectionRecordEntity(
     val userFingerprint: String,
     val deviceAddress: String,
     val analysisId: String?,
-    val analysisStatus: String?,
-    val analysisResultMarkdown: String?,
-    val analysisErrorCode: Int?,
-    val analysisErrorMessage: String?,
-    val analysisUpdatedAtEpochMillis: Long?,
 )
 
 internal fun CollectionRecord.toEntity() = CollectionRecordEntity(
@@ -43,12 +36,7 @@ internal fun CollectionRecord.toEntity() = CollectionRecordEntity(
     localFilePath = localFilePath,
     userFingerprint = userFingerprint,
     deviceAddress = deviceAddress,
-    analysisId = analysis?.analysisId,
-    analysisStatus = analysis?.status?.name,
-    analysisResultMarkdown = analysis?.resultMarkdown,
-    analysisErrorCode = analysis?.errorCode,
-    analysisErrorMessage = analysis?.errorMessage,
-    analysisUpdatedAtEpochMillis = analysis?.updatedAtEpochMillis,
+    analysisId = analysisId,
 )
 
 internal fun CollectionRecordEntity.toModel() = CollectionRecord(
@@ -60,14 +48,5 @@ internal fun CollectionRecordEntity.toModel() = CollectionRecord(
     localFilePath = localFilePath,
     userFingerprint = userFingerprint,
     deviceAddress = deviceAddress,
-    analysis = analysisStatus?.let { storedStatus ->
-        CollectionAnalysis(
-            analysisId = analysisId,
-            status = AnalysisStatus.valueOf(storedStatus),
-            resultMarkdown = analysisResultMarkdown,
-            errorCode = analysisErrorCode,
-            errorMessage = analysisErrorMessage,
-            updatedAtEpochMillis = analysisUpdatedAtEpochMillis ?: 0L,
-        )
-    },
+    analysisId = analysisId,
 )

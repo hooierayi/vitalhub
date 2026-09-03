@@ -4,7 +4,6 @@ import android.content.Context
 import com.alibaba.android.arouter.facade.annotation.Route
 import com.smarthealth.vitalhub.core.navi.Routes
 import com.smarthealth.vitalhub.provider.record.CollectionRecord
-import com.smarthealth.vitalhub.provider.record.CollectionAnalysis
 import com.smarthealth.vitalhub.provider.record.RecordProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -42,19 +41,14 @@ class RecordProviderImpl : RecordProvider {
         requireDatabase().collectionRecordDao().insert(record.toEntity()) >= 0L
     }.getOrDefault(false)
 
-    override suspend fun saveAnalysis(
+    override suspend fun saveAnalysisId(
         recordId: String,
-        analysis: CollectionAnalysis,
+        analysisId: String?,
     ): Boolean = runCatching {
         require(recordId.isNotBlank()) { "Record id must not be blank." }
-        requireDatabase().collectionRecordDao().updateAnalysis(
+        requireDatabase().collectionRecordDao().updateAnalysisId(
             recordId = recordId,
-            analysisId = analysis.analysisId,
-            status = analysis.status.name,
-            resultMarkdown = analysis.resultMarkdown,
-            errorCode = analysis.errorCode,
-            errorMessage = analysis.errorMessage,
-            updatedAtEpochMillis = analysis.updatedAtEpochMillis,
+            analysisId = analysisId,
         ) > 0
     }.getOrDefault(false)
 

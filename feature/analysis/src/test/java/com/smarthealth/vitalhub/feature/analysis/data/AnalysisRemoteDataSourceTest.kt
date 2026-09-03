@@ -51,8 +51,10 @@ class AnalysisRemoteDataSourceTest {
 
         val response = remote.upload(file, "1.2.3", "1.0") {}
 
+        assertTrue(response is RestResult.Success)
+        response as RestResult.Success
         assertEquals(202, response.httpCode)
-        assertEquals("A1", response.body?.data?.analysisId)
+        assertEquals("A1", response.body.data?.analysisId)
         val request = server.takeRequest()
         assertEquals("/api/v1/analyze", request.path)
         assertEquals("test-key", request.getHeader("X-API-Key"))
@@ -63,5 +65,25 @@ class AnalysisRemoteDataSourceTest {
         assertTrue(requestBody.contains("name=\"app_version\""))
         assertTrue(requestBody.contains("1.2.3"))
         assertTrue(requestBody.contains("name=\"protocol_version\""))
+    }
+
+    @Test
+    fun `non successful http remains failure even when body contains processing code`() = runTest {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(400)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"code":100,"message":"invalid request"}"""),
+        )
+        val file = File.createTempFile("analysis", ".dcm").apply { deleteOnExit() }
+        val client = NetworkClient.create(NetworkConfig(server.url("/").toString()))
+        val remote = RetrofitAnalysisRemoteDataSource(client.createService<AnalysisApi>())
+
+        val response = remote.upload(file, "1.2.3", "1.0") {}
+
+        assertTrue(response is RestResult.HttpFailure)
+        response as RestResult.HttpFailure
+        assertEquals(400, response.httpCode)
+        assertEquals(100, response.businessCode)
     }
 }

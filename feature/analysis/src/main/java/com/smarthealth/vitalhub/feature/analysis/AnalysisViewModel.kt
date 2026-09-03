@@ -7,12 +7,13 @@ import com.alibaba.android.arouter.launcher.ARouter
 import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisNetwork
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisFailureAction
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisProgress
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisRunner
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisTaskState
 import com.smarthealth.vitalhub.feature.analysis.data.DefaultAnalysisRepository
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
-import com.smarthealth.vitalhub.provider.record.AnalysisStatus
 import com.smarthealth.vitalhub.provider.record.RecordProvider
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import java.text.SimpleDateFormat
@@ -25,36 +26,40 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class AnalysisProcessStage {
-    UPLOADING,
-    QUEUED,
-    ANALYZING,
-    RETRYING,
-    COMPLETED,
-    FAILED,
-}
-
-data class AnalysisUiState(
+internal data class AnalysisUiState(
     val sessionId: String,
     val flowEntryMode: String,
     val recordId: String = "",
-    val processStage: AnalysisProcessStage = AnalysisProcessStage.UPLOADING,
-    val uploadProgress: Int = 0,
-    val processError: String? = null,
-    val resultMarkdown: String? = null,
+    val process: AnalysisTaskState = AnalysisTaskState.Uploading(0),
     val collectionCompletedAt: String,
     val deviceAddress: String,
     val collectorName: String,
 ) {
-    val completed: Boolean get() = processStage == AnalysisProcessStage.COMPLETED
+    val completed: Boolean get() = process is AnalysisTaskState.Completed
+
+    val resultMarkdown: String?
+        get() = (process as? AnalysisTaskState.Completed)?.markdown
 
     /** Upload cannot safely be abandoned before the server returns an analysis id. */
-    val canLeavePage: Boolean get() = processStage != AnalysisProcessStage.UPLOADING
+    val canLeavePage: Boolean get() = process !is AnalysisTaskState.Uploading
 
     /** Once accepted by the server, analysis can continue asynchronously. */
     val canContinueFlow: Boolean
-        get() = processStage != AnalysisProcessStage.UPLOADING &&
-            processStage != AnalysisProcessStage.FAILED
+        get() = process is AnalysisTaskState.Waiting || process is AnalysisTaskState.Completed
+
+    val canRetryProcess: Boolean
+        get() = when ((process as? AnalysisTaskState.Failed)?.action) {
+            AnalysisFailureAction.RETRY_UPLOAD,
+            AnalysisFailureAction.RESUME_QUERY,
+            AnalysisFailureAction.RESTART_ANALYSIS -> true
+            AnalysisFailureAction.NONE,
+            AnalysisFailureAction.RECOLLECT_DATA,
+            null -> false
+        }
+
+    val canRecollectData: Boolean
+        get() = (process as? AnalysisTaskState.Failed)?.action ==
+            AnalysisFailureAction.RECOLLECT_DATA
 }
 
 class AnalysisViewModel private constructor(
@@ -107,37 +112,42 @@ class AnalysisViewModel private constructor(
                 ?: "-",
         ),
     )
-    val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
+    internal val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
 
     init {
-        startProcess(retryFailed = false)
+        startProcess()
     }
 
     fun retryProcess() {
-        if (_uiState.value.processStage == AnalysisProcessStage.FAILED) {
-            startProcess(retryFailed = true)
+        val action = (_uiState.value.process as? AnalysisTaskState.Failed)?.action
+        if (_uiState.value.canRetryProcess && action != null) {
+            startProcess(action)
         }
     }
 
-    private fun startProcess(retryFailed: Boolean) {
+    private fun startProcess(action: AnalysisFailureAction? = null) {
         processJob?.cancel()
         val runner = analysisRunner
         if (runner == null) {
             _uiState.value = _uiState.value.copy(
-                processStage = AnalysisProcessStage.FAILED,
-                processError = initializationError ?: "分析服务初始化失败",
+                process = AnalysisTaskState.Failed(
+                    message = initializationError ?: "分析服务初始化失败",
+                    action = AnalysisFailureAction.NONE,
+                ),
             )
             return
         }
         processJob = viewModelScope.launch {
             try {
-                runner.execute(sessionId, retryFailed, ::applyProgress)
+                runner.execute(sessionId, action, ::applyProgress)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
                 _uiState.value = _uiState.value.copy(
-                    processStage = AnalysisProcessStage.FAILED,
-                    processError = error.message ?: "上传或分析失败，请重试",
+                    process = AnalysisTaskState.Failed(
+                        message = error.message ?: "上传或分析失败，请重试",
+                        action = AnalysisFailureAction.NONE,
+                    ),
                 )
             }
         }
@@ -146,10 +156,7 @@ class AnalysisViewModel private constructor(
     private fun applyProgress(progress: AnalysisProgress) {
         _uiState.value = _uiState.value.copy(
             recordId = progress.recordId,
-            processStage = progress.status.toProcessStage(),
-            uploadProgress = progress.uploadProgress,
-            processError = progress.errorMessage,
-            resultMarkdown = progress.resultMarkdown,
+            process = progress.state,
         )
     }
 }
@@ -179,15 +186,6 @@ private fun defaultAnalysisDependencies(): AnalysisViewModelDependencies {
         deviceProvider = resolveProvider(),
         userInfoProvider = resolveProvider(),
     )
-}
-
-private fun AnalysisStatus.toProcessStage(): AnalysisProcessStage = when (this) {
-    AnalysisStatus.UPLOADING -> AnalysisProcessStage.UPLOADING
-    AnalysisStatus.QUEUED -> AnalysisProcessStage.QUEUED
-    AnalysisStatus.PROCESSING -> AnalysisProcessStage.ANALYZING
-    AnalysisStatus.RETRYING -> AnalysisProcessStage.RETRYING
-    AnalysisStatus.COMPLETED -> AnalysisProcessStage.COMPLETED
-    AnalysisStatus.FAILED -> AnalysisProcessStage.FAILED
 }
 
 private inline fun <reified T> resolveProvider(): T? = runCatching {

@@ -17,7 +17,7 @@ internal object AnalysisNetwork {
                 readTimeoutMillis = 60_000L,
                 writeTimeoutMillis = 120_000L,
                 logLevel = if (BuildConfig.DEBUG) {
-                    NetworkLogLevel.BASIC
+                    NetworkLogLevel.BODY
                 } else {
                     NetworkLogLevel.NONE
                 },

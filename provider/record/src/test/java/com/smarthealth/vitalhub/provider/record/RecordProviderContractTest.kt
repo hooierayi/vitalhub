@@ -22,20 +22,17 @@ class RecordProviderContractTest {
     }
 
     @Test
-    fun `analysis state is saved on the matching collection record`() = runBlocking {
+    fun `analysis id is saved on the matching collection record`() = runBlocking {
         val provider = FakeRecordProvider()
         val record = record("record-1", completedAt = 100L)
-        val analysis = CollectionAnalysis(
-            analysisId = "analysis-1",
-            status = AnalysisStatus.COMPLETED,
-            resultMarkdown = "# report",
-            updatedAtEpochMillis = 200L,
-        )
         provider.saveRecord(record)
 
-        assertTrue(provider.saveAnalysis(record.id, analysis))
+        assertTrue(provider.saveAnalysisId(record.id, "analysis-1"))
 
-        assertEquals(analysis, provider.getRecordBySessionId(record.sessionId)?.analysis)
+        assertEquals(
+            "analysis-1",
+            provider.getRecordBySessionId(record.sessionId)?.analysisId,
+        )
     }
 
     private fun record(id: String, completedAt: Long) = CollectionRecord(
@@ -68,11 +65,11 @@ private class FakeRecordProvider : RecordProvider {
         return true
     }
 
-    override suspend fun saveAnalysis(
+    override suspend fun saveAnalysisId(
         recordId: String,
-        analysis: CollectionAnalysis,
+        analysisId: String?,
     ): Boolean {
         val current = records.value.firstOrNull { it.id == recordId } ?: return false
-        return saveRecord(current.copy(analysis = analysis))
+        return saveRecord(current.copy(analysisId = analysisId))
     }
 }

@@ -6,11 +6,13 @@ import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisProgress
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisRunner
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisFailureAction
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisTaskState
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisWaitingStatus
 import com.smarthealth.vitalhub.foundation.bluetooth.BluetoothKitDevice
 import com.smarthealth.vitalhub.provider.device.DeviceInfo
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
 import com.smarthealth.vitalhub.provider.device.DeviceRecordInfo
-import com.smarthealth.vitalhub.provider.record.AnalysisStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -51,19 +53,24 @@ class AnalysisViewModelTest {
         )
         runCurrent()
 
-        assertEquals(AnalysisProcessStage.UPLOADING, viewModel.uiState.value.processStage)
-        assertEquals(40, viewModel.uiState.value.uploadProgress)
+        assertEquals(AnalysisTaskState.Uploading(40), viewModel.uiState.value.process)
         assertFalse(viewModel.uiState.value.canLeavePage)
         assertFalse(viewModel.uiState.value.canContinueFlow)
 
         advanceTimeBy(100L)
         runCurrent()
-        assertEquals(AnalysisProcessStage.ANALYZING, viewModel.uiState.value.processStage)
+        assertEquals(
+            AnalysisTaskState.Waiting(AnalysisWaitingStatus.PROCESSING),
+            viewModel.uiState.value.process,
+        )
         assertTrue(viewModel.uiState.value.canLeavePage)
         assertTrue(viewModel.uiState.value.canContinueFlow)
 
         advanceUntilIdle()
-        assertEquals(AnalysisProcessStage.COMPLETED, viewModel.uiState.value.processStage)
+        assertEquals(
+            AnalysisTaskState.Completed("# 分析完成"),
+            viewModel.uiState.value.process,
+        )
         assertEquals("# 分析完成", viewModel.uiState.value.resultMarkdown)
         assertTrue(viewModel.uiState.value.canLeavePage)
         assertTrue(viewModel.uiState.value.canContinueFlow)
@@ -74,7 +81,7 @@ class AnalysisViewModelTest {
         val state = AnalysisUiState(
             sessionId = "session",
             flowEntryMode = FlowEntryMode.SEQUENTIAL,
-            processStage = AnalysisProcessStage.FAILED,
+            process = AnalysisTaskState.Failed("失败", AnalysisFailureAction.NONE),
             collectionCompletedAt = "-",
             deviceAddress = "-",
             collectorName = "-",
@@ -82,6 +89,46 @@ class AnalysisViewModelTest {
 
         assertTrue(state.canLeavePage)
         assertFalse(state.canContinueFlow)
+    }
+
+    @Test
+    fun `failed process only enables retry for supported recovery actions`() {
+        val base = AnalysisUiState(
+            sessionId = "session",
+            flowEntryMode = FlowEntryMode.SEQUENTIAL,
+            process = AnalysisTaskState.Failed("失败", AnalysisFailureAction.NONE),
+            collectionCompletedAt = "-",
+            deviceAddress = "-",
+            collectorName = "-",
+        )
+
+        assertFalse(base.canRetryProcess)
+        assertFalse(
+            base.copy(
+                process = AnalysisTaskState.Failed(
+                    "失败",
+                    AnalysisFailureAction.RECOLLECT_DATA,
+                ),
+            ).canRetryProcess,
+        )
+        assertTrue(
+            base.copy(
+                process = AnalysisTaskState.Failed(
+                    "失败",
+                    AnalysisFailureAction.RECOLLECT_DATA,
+                ),
+            ).canRecollectData,
+        )
+        assertTrue(
+            base.copy(
+                process = AnalysisTaskState.Failed("失败", AnalysisFailureAction.RETRY_UPLOAD),
+            ).canRetryProcess,
+        )
+        assertTrue(
+            base.copy(
+                process = AnalysisTaskState.Failed("失败", AnalysisFailureAction.RESUME_QUERY),
+            ).canRetryProcess,
+        )
     }
 
     @Test
@@ -118,18 +165,22 @@ class AnalysisViewModelTest {
     private class FakeAnalysisRunner : AnalysisRunner {
         override suspend fun execute(
             sessionId: String,
-            retryFailed: Boolean,
+            action: AnalysisFailureAction?,
             onProgress: (AnalysisProgress) -> Unit,
         ) {
-            onProgress(AnalysisProgress("CLIP-1", AnalysisStatus.UPLOADING, 40))
+            onProgress(AnalysisProgress("CLIP-1", AnalysisTaskState.Uploading(40)))
             delay(100L)
-            onProgress(AnalysisProgress("CLIP-1", AnalysisStatus.PROCESSING))
+            onProgress(
+                AnalysisProgress(
+                    "CLIP-1",
+                    AnalysisTaskState.Waiting(AnalysisWaitingStatus.PROCESSING),
+                ),
+            )
             delay(100L)
             onProgress(
                 AnalysisProgress(
                     recordId = "CLIP-1",
-                    status = AnalysisStatus.COMPLETED,
-                    resultMarkdown = "# 分析完成",
+                    state = AnalysisTaskState.Completed("# 分析完成"),
                 ),
             )
         }
@@ -138,7 +189,7 @@ class AnalysisViewModelTest {
     private object IdleAnalysisRunner : AnalysisRunner {
         override suspend fun execute(
             sessionId: String,
-            retryFailed: Boolean,
+            action: AnalysisFailureAction?,
             onProgress: (AnalysisProgress) -> Unit,
         ) = Unit
     }

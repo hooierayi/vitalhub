@@ -24,18 +24,10 @@ internal interface CollectionRecordDao {
     suspend fun insert(record: CollectionRecordEntity): Long
 
     @Query(
-        "UPDATE collection_records SET analysisId = :analysisId, " +
-            "analysisStatus = :status, analysisResultMarkdown = :resultMarkdown, " +
-            "analysisErrorCode = :errorCode, analysisErrorMessage = :errorMessage, " +
-            "analysisUpdatedAtEpochMillis = :updatedAtEpochMillis WHERE id = :recordId",
+        "UPDATE collection_records SET analysisId = :analysisId WHERE id = :recordId",
     )
-    suspend fun updateAnalysis(
+    suspend fun updateAnalysisId(
         recordId: String,
         analysisId: String?,
-        status: String,
-        resultMarkdown: String?,
-        errorCode: Int?,
-        errorMessage: String?,
-        updatedAtEpochMillis: Long,
     ): Int
 }
