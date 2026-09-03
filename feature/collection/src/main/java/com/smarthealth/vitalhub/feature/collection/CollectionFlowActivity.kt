@@ -3,6 +3,7 @@ package com.smarthealth.vitalhub.feature.collection
 import android.app.AlertDialog
 import android.os.Bundle
 import androidx.activity.viewModels
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -16,6 +17,7 @@ import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.Navigator
 import com.smarthealth.vitalhub.core.navi.RouteArgs
 import com.smarthealth.vitalhub.core.navi.Routes
+import com.smarthealth.vitalhub.foundation.device.api.DeviceCommand
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProvider
 import com.smarthealth.vitalhub.feature.collection.shared.CollectionBluetoothProviderState
 import com.smarthealth.vitalhub.feature.collection.shared.DeviceConnectionOperation
@@ -32,11 +34,23 @@ internal fun FlowDestination.restartsCollectionAfterReconnect(): Boolean = this 
     FlowDestination.CLIP_COLLECTION,
 )
 
+internal fun collectionCommandForNavigation(
+    previous: FlowDestination?,
+    current: FlowDestination,
+): DeviceCommand? = when {
+    previous == FlowDestination.DEVICE_CONNECTION && current == FlowDestination.LIVE_PREVIEW ->
+        DeviceCommand.StartCollection
+    previous == FlowDestination.LIVE_PREVIEW && current == FlowDestination.DEVICE_CONNECTION ->
+        DeviceCommand.StopCollection
+    else -> null
+}
+
 /** Owns the connected device and collection Fragment stack for one collection session. */
 @Route(path = Routes.COLLECTION_FLOW)
 class CollectionFlowActivity : BaseFlowActivity() {
     private val collectionBluetoothProvider by viewModels<CollectionBluetoothProvider>()
     private var connectionLostDialog: AlertDialog? = null
+    private var lastVisibleDestination: FlowDestination? = null
 
     private val initialDestination: FlowDestination by lazy {
         intent.getStringExtra(RouteArgs.FLOW_DESTINATION)
@@ -64,7 +78,33 @@ class CollectionFlowActivity : BaseFlowActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        observeCollectionNavigation()
         observeUnexpectedDisconnection()
+    }
+
+    private fun observeCollectionNavigation() {
+        // A restored Activity may already own the visible Fragment before callbacks are registered.
+        // Seeding it prevents configuration changes from looking like a fresh preview entry.
+        lastVisibleDestination = currentFlowDestination()
+        supportFragmentManager.registerFragmentLifecycleCallbacks(
+            object : FragmentManager.FragmentLifecycleCallbacks() {
+                override fun onFragmentResumed(fm: FragmentManager, fragment: Fragment) {
+                    val current = (fragment as? FlowDestinationOwner)
+                        ?.flowDestinationContext
+                        ?.destination
+                        ?: return
+                    val previous = lastVisibleDestination
+                    if (previous == current) return
+                    lastVisibleDestination = current
+                    collectionCommandForNavigation(previous, current)?.let { command ->
+                        lifecycleScope.launch {
+                            runCatching { collectionBluetoothProvider.execute(command) }
+                        }
+                    }
+                }
+            },
+            false,
+        )
     }
 
     override fun onDestroy() {

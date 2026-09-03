@@ -126,7 +126,7 @@ class CollectionBluetoothProvider(
         _uiState.value = _uiState.value.copy(scanning = false)
     }
 
-    /** Device-page connection: starts collection and publishes the event that opens preview. */
+    /** Device-page connection: connects the session and publishes the event that opens preview. */
     fun connect(deviceId: String) {
         val state = _uiState.value
         if (
@@ -137,12 +137,6 @@ class CollectionBluetoothProvider(
         markConnecting()
         viewModelScope.launch {
             runCatching { deviceSession.connect(deviceId) }
-                .mapCatching {
-                    requireSuccessfulCommand(
-                        command = DeviceCommand.StartCollection,
-                        rejectedAction = "启动",
-                    )
-                }
                 .onSuccess {
                     markConnected(device)
                     connectionEvents.send(Unit)
@@ -231,7 +225,6 @@ class CollectionBluetoothProvider(
             connectionError = null,
         )
         viewModelScope.launch {
-            runCatching { deviceSession.execute(DeviceCommand.StopCollection) }
             runCatching { deviceSession.disconnect() }
             _uiState.value = _uiState.value.copy(
                 connectedDeviceId = null,
