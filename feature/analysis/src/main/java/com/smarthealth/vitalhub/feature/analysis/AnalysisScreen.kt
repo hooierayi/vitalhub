@@ -1,5 +1,7 @@
 package com.smarthealth.vitalhub.feature.analysis
 
+import android.util.TypedValue
+import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,10 +34,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.smarthealth.vitalhub.core.ui.FlowButton
 import com.smarthealth.vitalhub.core.ui.FlowButtonStyle
 import com.smarthealth.vitalhub.core.ui.ProgressTrack
@@ -50,6 +56,24 @@ import com.smarthealth.vitalhub.core.ui.VitalColors
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisFailureAction
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisTaskState
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisWaitingStatus
+import coil.ImageLoader
+import coil.decode.GifDecoder
+import coil.decode.SvgDecoder
+import io.noties.markwon.Markwon
+import io.noties.markwon.SoftBreakAddsNewLinePlugin
+import io.noties.markwon.ext.latex.JLatexMathPlugin
+import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
+import io.noties.markwon.ext.tables.TableAwareMovementMethod
+import io.noties.markwon.ext.tables.TablePlugin
+import io.noties.markwon.ext.tasklist.TaskListPlugin
+import io.noties.markwon.html.HtmlPlugin
+import io.noties.markwon.image.coil.CoilImagesPlugin
+import io.noties.markwon.inlineparser.MarkwonInlineParserPlugin
+import io.noties.markwon.linkify.LinkifyPlugin
+import io.noties.markwon.movement.MovementMethodPlugin
+import io.noties.markwon.syntax.Prism4jThemeDefault
+import io.noties.markwon.syntax.SyntaxHighlightPlugin
+import io.noties.prism4j.Prism4j
 
 private val AnalysisCardShape = RoundedCornerShape(10.dp)
 private val AnalysisCardBorder = Color(0xFFD7E1E7)
@@ -258,6 +282,43 @@ private fun SectionHeading(text: String, top: Dp) {
 
 @Composable
 private fun AnalysisReportCard(markdown: String) {
+    val context = LocalContext.current
+    val markwon = remember(context) {
+        val markdownTextSizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            14f,
+            context.resources.displayMetrics,
+        )
+        val markdownImageLoader = ImageLoader.Builder(context)
+            .componentRegistry {
+                add(GifDecoder())
+                add(SvgDecoder(context))
+            }
+            .build()
+        Markwon.builder(context)
+            .usePlugin(MarkwonInlineParserPlugin.create())
+            .usePlugin(StrikethroughPlugin.create())
+            .usePlugin(TablePlugin.create(context))
+            .usePlugin(TaskListPlugin.create(context))
+            .usePlugin(CoilImagesPlugin.create(context, markdownImageLoader))
+            .usePlugin(HtmlPlugin.create())
+            .usePlugin(LinkifyPlugin.create())
+            .usePlugin(SoftBreakAddsNewLinePlugin.create())
+            .usePlugin(MovementMethodPlugin.create(TableAwareMovementMethod.create()))
+            .usePlugin(
+                JLatexMathPlugin.create(markdownTextSizePx) { builder ->
+                    builder.inlinesEnabled(true)
+                },
+            )
+            .usePlugin(
+                SyntaxHighlightPlugin.create(
+                    Prism4j(MarkdownGrammarLocator()),
+                    Prism4jThemeDefault.create(),
+                ),
+            )
+            .build()
+    }
+    val content = markdown.ifBlank { "服务器未返回报告内容" }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -265,11 +326,17 @@ private fun AnalysisReportCard(markdown: String) {
             .border(1.dp, AnalysisCardBorder, AnalysisCardShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Text(
-            text = markdown.ifBlank { "服务器未返回报告内容" },
-            fontSize = 14.sp,
-            lineHeight = 22.sp,
-            color = VitalColors.TextPrimary,
+        AndroidView(
+            factory = { viewContext ->
+                TextView(viewContext).apply {
+                    setTextColor(VitalColors.TextPrimary.toArgb())
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setLineSpacing(0f, 22f / 14f)
+                    includeFontPadding = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            update = { textView -> markwon.setMarkdown(textView, content) },
         )
     }
 }

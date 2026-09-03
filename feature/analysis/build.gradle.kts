@@ -80,7 +80,26 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp)
+    implementation(libs.markwon.core)
+    implementation(libs.markwon.ext.latex)
+    implementation(libs.markwon.ext.strikethrough)
+    implementation(libs.markwon.ext.tables)
+    implementation(libs.markwon.ext.tasklist)
+    implementation(libs.markwon.html)
+    implementation(libs.markwon.image.coil)
+    implementation(libs.markwon.inline.parser)
+    implementation(libs.markwon.linkify)
+    implementation(libs.markwon.syntax.highlight) {
+        exclude(group = "org.jetbrains", module = "annotations-java5")
+    }
+    implementation(libs.prism4j) {
+        exclude(group = "org.jetbrains", module = "annotations-java5")
+    }
+    implementation(libs.coil)
+    implementation(libs.coil.gif)
+    implementation(libs.coil.svg)
     kapt(libs.arouter.compiler)
+    kapt(libs.prism4j.bundler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
