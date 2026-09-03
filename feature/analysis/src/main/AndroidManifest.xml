@@ -2,5 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity android:name=".AnalysisActivity" android:exported="false" />
+        <activity android:name=".MarkdownImagePreviewActivity" android:exported="false" />
+        <activity android:name=".MarkdownPdfActivity" android:exported="false" />
     </application>
 </manifest>

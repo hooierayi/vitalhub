@@ -5,6 +5,7 @@ import com.didichuxing.doraemonkit.DoKit
 import com.smarthealth.vitalhub.debug.dokit.bluetooth.BluetoothDoKit
 import com.smarthealth.vitalhub.debug.dokit.protocol.ProtocolDoKit
 import com.smarthealth.vitalhub.debug.dokit.waveform.WaveformDoKit
+import com.smarthealth.vitalhub.feature.analysis.debug.AnalysisMockDoKit
 
 internal object DebugToolsInitializer {
     fun init(application: Application) {
@@ -15,6 +16,9 @@ internal object DebugToolsInitializer {
                         BluetoothDoKit(),
                         ProtocolDoKit(),
                         WaveformDoKit(),
+                    ),
+                    "VitalHub 网络调试" to listOf(
+                        AnalysisMockDoKit(),
                     ),
                 ),
             )

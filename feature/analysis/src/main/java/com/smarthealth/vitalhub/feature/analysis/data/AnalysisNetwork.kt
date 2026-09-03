@@ -5,10 +5,15 @@ import com.smarthealth.vitalhub.core.network.NetworkConfig
 import com.smarthealth.vitalhub.core.network.NetworkHeadersProvider
 import com.smarthealth.vitalhub.core.network.NetworkLogLevel
 import com.smarthealth.vitalhub.feature.analysis.BuildConfig
+import com.smarthealth.vitalhub.feature.analysis.debug.AnalysisMockConfig
+import com.smarthealth.vitalhub.feature.analysis.debug.AnalysisMockInterceptor
 
 internal object AnalysisNetwork {
     val remoteDataSource: AnalysisRemoteDataSource by lazy {
-        check(BuildConfig.ANALYSIS_API_KEY.isNotBlank()) {
+        check(
+            BuildConfig.ANALYSIS_API_KEY.isNotBlank() ||
+                (BuildConfig.DEBUG && AnalysisMockConfig.enabled),
+        ) {
             "未配置分析服务 API Key，请设置 Gradle 属性 analysisApiKey"
         }
         val client = NetworkClient.create(
@@ -28,6 +33,11 @@ internal object AnalysisNetwork {
                     mapOf("X-API-Key" to BuildConfig.ANALYSIS_API_KEY)
                 },
             ),
+            interceptors = if (BuildConfig.DEBUG) {
+                listOf(AnalysisMockInterceptor())
+            } else {
+                emptyList()
+            },
         )
         RetrofitAnalysisRemoteDataSource(client.createService<AnalysisApi>())
     }

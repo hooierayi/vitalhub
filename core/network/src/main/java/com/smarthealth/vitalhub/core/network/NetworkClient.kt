@@ -20,6 +20,12 @@ class NetworkClient private constructor(
         fun create(
             config: NetworkConfig,
             headersProviders: List<NetworkHeadersProvider> = emptyList(),
+        ): NetworkClient = create(config, headersProviders, emptyList())
+
+        fun create(
+            config: NetworkConfig,
+            headersProviders: List<NetworkHeadersProvider>,
+            interceptors: List<Interceptor>,
         ): NetworkClient {
             val okHttpClient = OkHttpClient.Builder()
                 .connectTimeout(config.connectTimeoutMillis, TimeUnit.MILLISECONDS)
@@ -37,6 +43,7 @@ class NetworkClient private constructor(
                             ),
                         )
                     }
+                    interceptors.forEach(::addInterceptor)
                 }
                 .build()
 

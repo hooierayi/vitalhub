@@ -5,8 +5,10 @@ import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -56,24 +58,7 @@ import com.smarthealth.vitalhub.core.ui.VitalColors
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisFailureAction
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisTaskState
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisWaitingStatus
-import coil.ImageLoader
-import coil.decode.GifDecoder
-import coil.decode.SvgDecoder
 import io.noties.markwon.Markwon
-import io.noties.markwon.SoftBreakAddsNewLinePlugin
-import io.noties.markwon.ext.latex.JLatexMathPlugin
-import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
-import io.noties.markwon.ext.tables.TableAwareMovementMethod
-import io.noties.markwon.ext.tables.TablePlugin
-import io.noties.markwon.ext.tasklist.TaskListPlugin
-import io.noties.markwon.html.HtmlPlugin
-import io.noties.markwon.image.coil.CoilImagesPlugin
-import io.noties.markwon.inlineparser.MarkwonInlineParserPlugin
-import io.noties.markwon.linkify.LinkifyPlugin
-import io.noties.markwon.movement.MovementMethodPlugin
-import io.noties.markwon.syntax.Prism4jThemeDefault
-import io.noties.markwon.syntax.SyntaxHighlightPlugin
-import io.noties.prism4j.Prism4j
 
 private val AnalysisCardShape = RoundedCornerShape(10.dp)
 private val AnalysisCardBorder = Color(0xFFD7E1E7)
@@ -284,41 +269,12 @@ private fun SectionHeading(text: String, top: Dp) {
 private fun AnalysisReportCard(markdown: String) {
     val context = LocalContext.current
     val markwon = remember(context) {
-        val markdownTextSizePx = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_SP,
-            14f,
-            context.resources.displayMetrics,
-        )
-        val markdownImageLoader = ImageLoader.Builder(context)
-            .componentRegistry {
-                add(GifDecoder())
-                add(SvgDecoder(context))
-            }
-            .build()
-        Markwon.builder(context)
-            .usePlugin(MarkwonInlineParserPlugin.create())
-            .usePlugin(StrikethroughPlugin.create())
-            .usePlugin(TablePlugin.create(context))
-            .usePlugin(TaskListPlugin.create(context))
-            .usePlugin(CoilImagesPlugin.create(context, markdownImageLoader))
-            .usePlugin(HtmlPlugin.create())
-            .usePlugin(LinkifyPlugin.create())
-            .usePlugin(SoftBreakAddsNewLinePlugin.create())
-            .usePlugin(MovementMethodPlugin.create(TableAwareMovementMethod.create()))
-            .usePlugin(
-                JLatexMathPlugin.create(markdownTextSizePx) { builder ->
-                    builder.inlinesEnabled(true)
-                },
-            )
-            .usePlugin(
-                SyntaxHighlightPlugin.create(
-                    Prism4j(MarkdownGrammarLocator()),
-                    Prism4jThemeDefault.create(),
-                ),
-            )
-            .build()
+        createMarkdownRenderer(context)
     }
-    val content = markdown.ifBlank { "服务器未返回报告内容" }
+    val content = normalizeInlineLatex(
+        normalizeFootnotes(markdown.ifBlank { "服务器未返回报告内容" }),
+    )
+    val blocks = remember(content) { splitMarkdownTables(content) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -326,19 +282,51 @@ private fun AnalysisReportCard(markdown: String) {
             .border(1.dp, AnalysisCardBorder, AnalysisCardShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        AndroidView(
-            factory = { viewContext ->
-                TextView(viewContext).apply {
-                    setTextColor(VitalColors.TextPrimary.toArgb())
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                    setLineSpacing(0f, 22f / 14f)
-                    includeFontPadding = false
+        blocks.forEach { block ->
+            if (block.isTable) {
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val tableWidth = maxOf(maxWidth, (block.tableColumnCount!! * 116).dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                    ) {
+                        MarkdownText(
+                            markwon = markwon,
+                            markdown = block.markdown,
+                            modifier = Modifier.width(tableWidth),
+                        )
+                    }
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            update = { textView -> markwon.setMarkdown(textView, content) },
-        )
+            } else {
+                MarkdownText(markwon, block.markdown, Modifier.fillMaxWidth())
+            }
+        }
     }
+}
+
+@Composable
+private fun MarkdownText(markwon: Markwon, markdown: String, modifier: Modifier) {
+    AndroidView(
+        factory = { viewContext ->
+            TextView(viewContext).apply {
+                val markdownLineExtraPx = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    8f,
+                    resources.displayMetrics,
+                )
+                setTextColor(VitalColors.TextPrimary.toArgb())
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                // A multiplier also scales ReplacementSpan image rows and creates large
+                // blank areas above images. Additive spacing keeps text readable without
+                // stretching SVG/GIF rows.
+                setLineSpacing(markdownLineExtraPx, 1f)
+                includeFontPadding = false
+            }
+        },
+        modifier = modifier,
+        update = { textView -> markwon.setMarkdown(textView, markdown) },
+    )
 }
 
 @Composable

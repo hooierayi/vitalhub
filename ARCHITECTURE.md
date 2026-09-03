@@ -39,7 +39,7 @@ core:navi ◄──────────── app、provider 与所有 featu
 - `feature:user`：用户信息编辑页面，以及以 ARouter Provider 暴露的 Room `UserInfoProvider` 实现；用户以姓名、性别、年龄的 SHA-256 指纹关联，修改资料时切换 active/inactive。
 - `feature:questionnaire`：采集前睡眠问卷、采集后热相关症状问卷。
 - `feature:collection`：采集流程 Activity，内部包含 BLE 扫描、连接、设备状态、实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程状态机的 MMKV Provider 和完成记录的 Room Provider 实现；运行时权限在进入 Activity 前处理。
-- `feature:analysis`：上传本地 DICOM、基于持久化 `analysisId` 轮询异步 AI 分析任务，并以页面状态机展示进度、错误和 Markdown 结果。
+- `feature:analysis`：上传本地 DICOM、基于持久化 `analysisId` 轮询异步 AI 分析任务，并以页面状态机展示进度、错误和 Markdown 结果；报告内 PDF 链接由本模块在应用内下载并分页展示。
 - `debug:dokit-bluetooth`、`debug:dokit-protocol`、`debug:dokit-waveform`：仅通过
   `app` 的 `debugImplementation` 接入的 DoKit 自定义工具，分别以可拖动的 App 内悬浮卡片
   观察蓝牙原始收发、协议/指令交互和波形环形缓冲，并可进入完整详情页；不申请系统悬浮窗权限，

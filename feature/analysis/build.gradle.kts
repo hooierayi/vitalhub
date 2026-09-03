@@ -98,6 +98,10 @@ dependencies {
     implementation(libs.coil)
     implementation(libs.coil.gif)
     implementation(libs.coil.svg)
+    debugImplementation(libs.dokitx) {
+        exclude(group = "com.android.volley", module = "volley")
+    }
+    debugImplementation(libs.volley)
     kapt(libs.arouter.compiler)
     kapt(libs.prism4j.bundler)
     testImplementation(libs.junit)

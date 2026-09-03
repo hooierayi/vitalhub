@@ -121,7 +121,7 @@ graph TD
 | `:feature:user` | Android library | common、navi、provider:user、Room | app | 用户资料 Activity、内部 Fragment 与 Room 用户资料实现 |
 | `:feature:questionnaire` | Android library | common、navi、provider:collection | app | 前后问卷 Activity 与内部 Fragment |
 | `:feature:collection` | Android library | common、device-waveform-ui、navi、storage、foundation:bluetooth、device-api、device-sdk、file-protocol、provider:collection、provider:device、provider:record、Room | app | BLE 设备、采集 Activity、内部 Fragment、DICOM 片段文件、完成记录与流程状态机实现 |
-| `:feature:analysis` | Android library | common、navi、network、record/user/device/collection Provider、Retrofit、OkHttp、Markwon 及格式扩展、Prism4j | app | DICOM multipart 上传、异步任务轮询、状态恢复与完整 Markdown 结果渲染 |
+| `:feature:analysis` | Android library | common、navi、network、record/user/device/collection Provider、Retrofit、OkHttp、Markwon 及格式扩展、Prism4j、DoKit（debug only） | app | DICOM multipart 上传、异步任务轮询、状态恢复与完整 Markdown 结果渲染；Debug 可切换完整 Markdown Mock |
 | `:debug:dokit-bluetooth` | Android library（debug only） | device-api、DoKit | app debug | 蓝牙连接、完整原始 RX/TX 数据调试面板 |
 | `:debug:dokit-protocol` | Android library（debug only） | device-api、DoKit | app debug | 协议缓冲、拆包恢复、指令及回执调试面板 |
 | `:debug:dokit-waveform` | Android library（debug only） | device-waveform-ui、DoKit | app debug | ECG/呼吸环形缓冲容量、游标、覆盖和采样范围调试面板 |
