@@ -24,14 +24,14 @@ class AnalysisFragment : BaseFlowFragment(), AppBarDestination {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val blockBackBeforeCompletion = object : OnBackPressedCallback(true) {
+        val blockBackDuringUpload = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = Unit
         }
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, blockBackBeforeCompletion)
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, blockBackDuringUpload)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
-                    blockBackBeforeCompletion.isEnabled = !state.completed
+                    blockBackDuringUpload.isEnabled = !state.canLeavePage
                 }
             }
         }
@@ -43,9 +43,9 @@ class AnalysisFragment : BaseFlowFragment(), AppBarDestination {
         AnalysisScreen(
             state = state,
             onHome = { Navigator.returnHome(requireContext()) },
-            onRetry = viewModel::retryMockProcess,
+            onRetry = viewModel::retryProcess,
             onPostQuestionnaire = {
-                if (state.completed) {
+                if (state.canContinueFlow) {
                     Navigator.flow(
                         context = requireContext(),
                         sessionId = state.sessionId,

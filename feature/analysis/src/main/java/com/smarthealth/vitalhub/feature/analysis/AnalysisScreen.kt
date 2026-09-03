@@ -1,6 +1,5 @@
 package com.smarthealth.vitalhub.feature.analysis
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,15 +20,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
@@ -39,10 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -60,7 +52,6 @@ private val AnalysisCardShape = RoundedCornerShape(10.dp)
 private val AnalysisCardBorder = Color(0xFFD7E1E7)
 private val AnalysisMintBorder = Color(0xFFBFE4DC)
 private val AnalysisMintSurface = Color(0xFFF1F9F6)
-private val MetricTrendColor = Color(0xFF08A47E)
 private val RecordIconColor = Color(0xFF2E8FF4)
 
 @Composable
@@ -82,15 +73,8 @@ fun AnalysisScreen(
                 SectionHeading("本次记录信息", top = 24.dp)
                 RecordInformationCard(state)
                 if (state.completed) {
-                    SectionHeading("关键指标趋势", top = 24.dp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        state.metrics.forEachIndexed { index, metric ->
-                            MetricTrendCard(metric = metric, index = index)
-                        }
-                    }
+                    SectionHeading("分析报告", top = 24.dp)
+                    AnalysisReportCard(state.resultMarkdown.orEmpty())
                 }
             }
             Surface(color = Color.White, shadowElevation = 5.dp) {
@@ -101,7 +85,7 @@ fun AnalysisScreen(
                     onHome = onHome,
                     onRetry = onRetry,
                     onPostQuestionnaire = onPostQuestionnaire,
-                    processStage = state.processStage,
+                    state = state,
                 )
             }
         }
@@ -202,10 +186,30 @@ private fun processVisual(state: AnalysisUiState): ProcessVisual = when (state.p
         surfaceColor = AnalysisMintSurface,
         borderColor = AnalysisMintBorder,
     )
+    AnalysisProcessStage.QUEUED -> ProcessVisual(
+        title = "上传完成，等待分析",
+        statusText = "排队中",
+        description = "分析任务已进入服务器队列",
+        progress = 1f,
+        icon = Icons.Default.QueryStats,
+        accentColor = VitalColors.Blue,
+        surfaceColor = Color(0xFFF3F7FD),
+        borderColor = Color(0xFFC9DCF7),
+    )
     AnalysisProcessStage.ANALYZING -> ProcessVisual(
         title = "上传完成，分析中",
         statusText = "分析中",
         description = "服务器正在分析采集数据",
+        progress = 1f,
+        icon = Icons.Default.QueryStats,
+        accentColor = VitalColors.Blue,
+        surfaceColor = Color(0xFFF3F7FD),
+        borderColor = Color(0xFFC9DCF7),
+    )
+    AnalysisProcessStage.RETRYING -> ProcessVisual(
+        title = "上传完成，分析重试中",
+        statusText = "重试中",
+        description = "服务器正在重新执行分析任务",
         progress = 1f,
         icon = Icons.Default.QueryStats,
         accentColor = VitalColors.Blue,
@@ -246,94 +250,21 @@ private fun SectionHeading(text: String, top: Dp) {
 }
 
 @Composable
-private fun RowScope.MetricTrendCard(metric: AnalysisMetric, index: Int) {
-    val visual = metricVisual(index)
+private fun AnalysisReportCard(markdown: String) {
     Column(
         modifier = Modifier
-            .weight(1f)
-            .height(148.dp)
+            .fillMaxWidth()
             .background(Color.White, AnalysisCardShape)
             .border(1.dp, AnalysisCardBorder, AnalysisCardShape)
-            .padding(horizontal = 10.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = visual.icon,
-                contentDescription = null,
-                tint = visual.color,
-                modifier = Modifier.size(22.dp),
-            )
-            Text(
-                text = "${metric.name} (${metric.unit})",
-                modifier = Modifier.padding(start = 5.dp),
-                fontSize = 10.sp,
-                color = VitalColors.TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
         Text(
-            text = metric.value,
-            modifier = Modifier.fillMaxWidth().padding(top = 9.dp),
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Medium,
+            text = markdown.ifBlank { "服务器未返回报告内容" },
+            fontSize = 14.sp,
+            lineHeight = 22.sp,
             color = VitalColors.TextPrimary,
-            textAlign = TextAlign.Center,
-        )
-        Row(
-            modifier = Modifier.padding(top = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = if (metric.increasing) "↑" else "↓",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = MetricTrendColor,
-            )
-            Text(
-                text = metric.comparison,
-                modifier = Modifier.padding(start = 3.dp),
-                fontSize = 10.sp,
-                color = VitalColors.TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        MetricTrendLine(
-            values = metric.trend,
-            modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 7.dp),
         )
     }
-}
-
-@Composable
-private fun MetricTrendLine(values: List<Float>, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        if (values.size < 2) return@Canvas
-        val min = values.minOrNull() ?: return@Canvas
-        val max = values.maxOrNull() ?: return@Canvas
-        val range = (max - min).takeIf { it > 0f } ?: 1f
-        val points = values.mapIndexed { index, value ->
-            Offset(
-                x = size.width * index / values.lastIndex,
-                y = size.height - ((value - min) / range * size.height * 0.72f + size.height * 0.14f),
-            )
-        }
-        val path = Path().apply {
-            moveTo(points.first().x, points.first().y)
-            points.drop(1).forEach { lineTo(it.x, it.y) }
-        }
-        drawPath(path, MetricTrendColor, style = Stroke(width = 1.8.dp.toPx()))
-        points.forEach { drawCircle(MetricTrendColor, radius = 2.7.dp.toPx(), center = it) }
-    }
-}
-
-private data class MetricVisual(val icon: ImageVector, val color: Color)
-
-private fun metricVisual(index: Int): MetricVisual = when (index % 3) {
-    0 -> MetricVisual(Icons.Default.Favorite, Color(0xFF00BFA1))
-    1 -> MetricVisual(Icons.Default.WaterDrop, Color(0xFF439AF2))
-    else -> MetricVisual(Icons.Default.Bedtime, Color(0xFF9C78E8))
 }
 
 @Composable
@@ -399,10 +330,10 @@ private fun AnalysisActions(
     onHome: () -> Unit,
     onRetry: () -> Unit,
     onPostQuestionnaire: () -> Unit,
-    processStage: AnalysisProcessStage,
+    state: AnalysisUiState,
 ) {
-    val completed = processStage == AnalysisProcessStage.COMPLETED
-    val failed = processStage == AnalysisProcessStage.FAILED
+    val uploading = state.processStage == AnalysisProcessStage.UPLOADING
+    val failed = state.processStage == AnalysisProcessStage.FAILED
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -412,29 +343,34 @@ private fun AnalysisActions(
             modifier = Modifier
                 .width(72.dp)
                 .height(57.dp)
-                .clickable(enabled = completed, role = Role.Button, onClick = onHome),
+                .clickable(enabled = state.canLeavePage, role = Role.Button, onClick = onHome),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Home,
                 contentDescription = null,
-                tint = VitalColors.Teal.copy(alpha = if (completed) 1f else 0.38f),
+                tint = VitalColors.Teal.copy(alpha = if (state.canLeavePage) 1f else 0.38f),
                 modifier = Modifier.size(27.dp),
             )
             Text(
                 text = "回首页",
-                color = VitalColors.Teal.copy(alpha = if (completed) 1f else 0.38f),
+                color = VitalColors.Teal.copy(alpha = if (state.canLeavePage) 1f else 0.38f),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             )
         }
         FlowButton(
-            label = if (failed) "重新上传" else "填写采集后问卷",
+            label = when {
+                uploading -> "上传中"
+                failed -> "重新上传"
+                else -> "填写采集后问卷"
+            },
             style = FlowButtonStyle.PRIMARY,
             modifier = Modifier.weight(1f).height(57.dp),
             onClick = if (failed) onRetry else onPostQuestionnaire,
-            enabled = completed || failed,
+            enabled = state.canContinueFlow || failed,
+            loading = uploading,
         )
     }
 }

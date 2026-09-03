@@ -4,16 +4,49 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.kapt)
 }
 
+fun buildConfigString(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val analysisBaseUrl = providers.gradleProperty("analysisBaseUrl")
+    .orElse("https://app.friendshipoffice.xyz/")
+val analysisDebugBaseUrl = providers.gradleProperty("analysisDebugBaseUrl")
+    .orElse("http://47.98.175.38:8000/")
+val analysisApiKey = providers.gradleProperty("analysisApiKey").orElse("")
+val analysisAppVersion = providers.gradleProperty("versionName").orElse("1.0")
+
 android {
     namespace = "com.smarthealth.vitalhub.feature.analysis"
     compileSdk = 34
-    defaultConfig { minSdk = 24 }
+    defaultConfig {
+        minSdk = 24
+        buildConfigField("String", "ANALYSIS_API_KEY", buildConfigString(analysisApiKey.get()))
+        buildConfigField("String", "ANALYSIS_APP_VERSION", buildConfigString(analysisAppVersion.get()))
+    }
+    buildTypes {
+        debug {
+            buildConfigField(
+                "String",
+                "ANALYSIS_BASE_URL",
+                buildConfigString(analysisDebugBaseUrl.get()),
+            )
+        }
+        release {
+            buildConfigField(
+                "String",
+                "ANALYSIS_BASE_URL",
+                buildConfigString(analysisBaseUrl.get()),
+            )
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions { jvmTarget = "1.8" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     composeOptions { kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get() }
 }
 
@@ -24,6 +57,7 @@ kapt {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:navi"))
+    implementation(project(":core:network"))
     implementation(project(":foundation:bluetooth"))
     implementation(project(":provider:collection"))
     implementation(project(":provider:device"))
@@ -43,7 +77,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp)
     kapt(libs.arouter.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }

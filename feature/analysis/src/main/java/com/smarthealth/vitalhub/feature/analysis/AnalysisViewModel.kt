@@ -6,8 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.alibaba.android.arouter.launcher.ARouter
 import com.smarthealth.vitalhub.core.navi.FlowEntryMode
 import com.smarthealth.vitalhub.core.navi.RouteArgs
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisNetwork
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisProgress
+import com.smarthealth.vitalhub.feature.analysis.data.AnalysisRunner
+import com.smarthealth.vitalhub.feature.analysis.data.DefaultAnalysisRepository
 import com.smarthealth.vitalhub.provider.collection.CollectionFlowProvider
 import com.smarthealth.vitalhub.provider.device.DeviceProvider
+import com.smarthealth.vitalhub.provider.record.AnalysisStatus
 import com.smarthealth.vitalhub.provider.record.RecordProvider
 import com.smarthealth.vitalhub.provider.user.UserInfoProvider
 import java.text.SimpleDateFormat
@@ -15,24 +20,16 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class AnalysisMetric(
-    val name: String,
-    val value: String,
-    val unit: String,
-    val comparison: String,
-    val increasing: Boolean,
-    val trend: List<Float>,
-)
-
 enum class AnalysisProcessStage {
     UPLOADING,
+    QUEUED,
     ANALYZING,
+    RETRYING,
     COMPLETED,
     FAILED,
 }
@@ -44,40 +41,67 @@ data class AnalysisUiState(
     val processStage: AnalysisProcessStage = AnalysisProcessStage.UPLOADING,
     val uploadProgress: Int = 0,
     val processError: String? = null,
-    val metrics: List<AnalysisMetric> = listOf(
-        AnalysisMetric("心率", "72", "次/分", "较上次下降 4", false, listOf(78f, 76f, 75f, 74f, 72f)),
-        AnalysisMetric("血氧饱和度", "98", "%", "较上次上升 1", true, listOf(94f, 95f, 96f, 98f)),
-        AnalysisMetric("睡眠时长", "7.2", "小时", "较上次上升 0.6", true, listOf(5.8f, 6.3f, 6.5f, 7.2f)),
-    ),
+    val resultMarkdown: String? = null,
     val collectionCompletedAt: String,
     val deviceAddress: String,
     val collectorName: String,
 ) {
     val completed: Boolean get() = processStage == AnalysisProcessStage.COMPLETED
+
+    /** Upload cannot safely be abandoned before the server returns an analysis id. */
+    val canLeavePage: Boolean get() = processStage != AnalysisProcessStage.UPLOADING
+
+    /** Once accepted by the server, analysis can continue asynchronously. */
+    val canContinueFlow: Boolean
+        get() = processStage != AnalysisProcessStage.UPLOADING &&
+            processStage != AnalysisProcessStage.FAILED
 }
 
-class AnalysisViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
-    private val collectionFlowProvider = resolveProvider<CollectionFlowProvider>()
-    private val deviceProvider = resolveProvider<DeviceProvider>()
-    private val recordProvider = resolveProvider<RecordProvider>()
-    private val userInfoProvider = resolveProvider<UserInfoProvider>()
+class AnalysisViewModel private constructor(
+    savedStateHandle: SavedStateHandle,
+    dependencies: AnalysisViewModelDependencies,
+) : ViewModel() {
+    constructor(savedStateHandle: SavedStateHandle) : this(
+        savedStateHandle,
+        defaultAnalysisDependencies(),
+    )
+
+    internal constructor(
+        savedStateHandle: SavedStateHandle,
+        analysisRunner: AnalysisRunner,
+        collectionFlowProvider: CollectionFlowProvider? = null,
+        deviceProvider: DeviceProvider? = null,
+        userInfoProvider: UserInfoProvider? = null,
+    ) : this(
+        savedStateHandle,
+        AnalysisViewModelDependencies(
+            analysisRunner = analysisRunner,
+            initializationError = null,
+            collectionFlowProvider = collectionFlowProvider,
+            deviceProvider = deviceProvider,
+            userInfoProvider = userInfoProvider,
+        ),
+    )
+
     private val sessionId = savedStateHandle.get<String>(RouteArgs.SESSION_ID).orEmpty()
     private val flowEntryMode = savedStateHandle.get<String>(RouteArgs.FLOW_ENTRY_MODE)
         ?: FlowEntryMode.SEQUENTIAL
+    private val analysisRunner = dependencies.analysisRunner
+    private val initializationError = dependencies.initializationError
+    private var processJob: Job? = null
     private val collectionCompletedAt = runCatching {
-        collectionFlowProvider?.getCurrentSession()
+        dependencies.collectionFlowProvider?.getCurrentSession()
             ?.takeIf { snapshot -> snapshot.sessionId == sessionId }
             ?.collectionCompletedAtEpochMillis
     }.getOrNull()
-    private var mockProcessJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         AnalysisUiState(
             sessionId = sessionId,
             flowEntryMode = flowEntryMode,
             collectionCompletedAt = collectionCompletedAt?.let(::formatCollectionTime) ?: "-",
-            deviceAddress = resolveDeviceAddress(deviceProvider),
-            collectorName = runCatching { userInfoProvider?.getUser()?.name }
+            deviceAddress = resolveDeviceAddress(dependencies.deviceProvider),
+            collectorName = runCatching { dependencies.userInfoProvider?.getUser()?.name }
                 .getOrNull()
                 ?.takeIf(String::isNotBlank)
                 ?: "-",
@@ -86,56 +110,84 @@ class AnalysisViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
 
     init {
-        loadRecordId()
-        startMockProcess()
+        startProcess(retryFailed = false)
     }
 
-    fun retryMockProcess() {
-        if (_uiState.value.processStage == AnalysisProcessStage.FAILED) startMockProcess()
-    }
-
-    private fun loadRecordId() {
-        viewModelScope.launch {
-            val recordId = runCatching {
-                recordProvider?.getAllRecords()
-                    ?.firstOrNull { record -> record.sessionId == sessionId }
-                    ?.id
-            }.getOrNull().orEmpty()
-            _uiState.value = _uiState.value.copy(recordId = recordId)
+    fun retryProcess() {
+        if (_uiState.value.processStage == AnalysisProcessStage.FAILED) {
+            startProcess(retryFailed = true)
         }
     }
 
-    private fun startMockProcess() {
-        mockProcessJob?.cancel()
-        mockProcessJob = viewModelScope.launch {
+    private fun startProcess(retryFailed: Boolean) {
+        processJob?.cancel()
+        val runner = analysisRunner
+        if (runner == null) {
             _uiState.value = _uiState.value.copy(
-                processStage = AnalysisProcessStage.UPLOADING,
-                uploadProgress = 0,
-                processError = null,
+                processStage = AnalysisProcessStage.FAILED,
+                processError = initializationError ?: "分析服务初始化失败",
             )
+            return
+        }
+        processJob = viewModelScope.launch {
             try {
-                for (progress in 5..100 step 5) {
-                    delay(MOCK_UPLOAD_STEP_DELAY_MILLIS)
-                    _uiState.value = _uiState.value.copy(uploadProgress = progress)
-                }
-                _uiState.value = _uiState.value.copy(processStage = AnalysisProcessStage.ANALYZING)
-                delay(MOCK_ANALYSIS_DELAY_MILLIS)
-                _uiState.value = _uiState.value.copy(processStage = AnalysisProcessStage.COMPLETED)
+                runner.execute(sessionId, retryFailed, ::applyProgress)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Throwable) {
+            } catch (error: Throwable) {
                 _uiState.value = _uiState.value.copy(
                     processStage = AnalysisProcessStage.FAILED,
-                    processError = "上传或分析失败，请重试",
+                    processError = error.message ?: "上传或分析失败，请重试",
                 )
             }
         }
     }
 
-    private companion object {
-        const val MOCK_UPLOAD_STEP_DELAY_MILLIS = 80L
-        const val MOCK_ANALYSIS_DELAY_MILLIS = 1_500L
+    private fun applyProgress(progress: AnalysisProgress) {
+        _uiState.value = _uiState.value.copy(
+            recordId = progress.recordId,
+            processStage = progress.status.toProcessStage(),
+            uploadProgress = progress.uploadProgress,
+            processError = progress.errorMessage,
+            resultMarkdown = progress.resultMarkdown,
+        )
     }
+}
+
+private data class AnalysisViewModelDependencies(
+    val analysisRunner: AnalysisRunner?,
+    val initializationError: String?,
+    val collectionFlowProvider: CollectionFlowProvider?,
+    val deviceProvider: DeviceProvider?,
+    val userInfoProvider: UserInfoProvider?,
+)
+
+private fun defaultAnalysisDependencies(): AnalysisViewModelDependencies {
+    val recordProvider = resolveProvider<RecordProvider>()
+    val runner = runCatching {
+        checkNotNull(recordProvider) { "采集记录服务不可用" }
+        DefaultAnalysisRepository(
+            recordProvider = recordProvider,
+            remoteDataSource = AnalysisNetwork.remoteDataSource,
+            appVersion = BuildConfig.ANALYSIS_APP_VERSION,
+        )
+    }
+    return AnalysisViewModelDependencies(
+        analysisRunner = runner.getOrNull(),
+        initializationError = runner.exceptionOrNull()?.message,
+        collectionFlowProvider = resolveProvider(),
+        deviceProvider = resolveProvider(),
+        userInfoProvider = resolveProvider(),
+    )
+}
+
+private fun AnalysisStatus.toProcessStage(): AnalysisProcessStage = when (this) {
+    AnalysisStatus.UPLOADING -> AnalysisProcessStage.UPLOADING
+    AnalysisStatus.QUEUED -> AnalysisProcessStage.QUEUED
+    AnalysisStatus.PROCESSING -> AnalysisProcessStage.ANALYZING
+    AnalysisStatus.RETRYING -> AnalysisProcessStage.RETRYING
+    AnalysisStatus.COMPLETED -> AnalysisProcessStage.COMPLETED
+    AnalysisStatus.FAILED -> AnalysisProcessStage.FAILED
 }
 
 private inline fun <reified T> resolveProvider(): T? = runCatching {

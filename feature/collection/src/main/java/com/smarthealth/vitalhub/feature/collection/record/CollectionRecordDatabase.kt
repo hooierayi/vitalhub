@@ -18,7 +18,6 @@ internal abstract class CollectionRecordDatabase : RoomDatabase() {
             context.applicationContext,
             CollectionRecordDatabase::class.java,
             "vitalhub-records.db",
-        )
-            .build()
+        ).build()
     }
 }

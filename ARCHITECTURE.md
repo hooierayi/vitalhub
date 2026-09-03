@@ -22,23 +22,24 @@ core:navi ◄──────────── app、provider 与所有 featu
 - `core:navi`：ARouter 路径与参数、`Navigator`、Fragment 导航宿主契约、流程返回策略与导航去重；不依赖业务 feature。
 - `core:permission`：可注入的运行时权限定义、统一检查/申请、端内拒绝兜底弹窗及应用设置页跳转；不依赖业务 feature。应用层注入权限、路由守卫、前台 Activity 来源和弹窗实现，具体权限声明由使用它的 feature Manifest 提供。
 - `core:storage`：可复用的本地键值存储，提供 SharedPreferences/MMKV 后端、批量编辑和可选 Android Keystore 加密。
+- `core:network`：可复用的 Retrofit/OkHttp 网络客户端，提供 Gson 转换、超时、动态请求头和显式启用的脱敏 HTTP 日志配置；base URL 与业务接口归属各 feature。
 - `foundation:bluetooth`：可复用的经典蓝牙与 BLE 基础组件，提供扫描、连接、读写及事件回调能力。
 - `foundation:device-api`：业务可见的 `DeviceSdk`、`DeviceSession`、聚合数据帧、指令与状态契约。
 - `foundation:device-transport`：把底层蓝牙回调适配为有序字节流和挂起式写入，不识别协议。
 - `foundation:device-protocol`：自动扩容环形缓冲、可配置拦截器管线、拆包、校验、序号连续性和聚合帧解析。
 - `foundation:device-command`：有界优先级指令队列、单飞 Worker、编码、回执匹配、超时及幂等重试。
 - `foundation:device-storage`：解析后聚合帧的异步无静默丢帧存储和 `.part` 文件收口。
-- `foundation:device-waveform`：从聚合帧分别投影 `EcgWaveformFrame` / `RespirationWaveformFrame`，并隔离慢 UI 消费者。
 - `foundation:file-protocol`：基于 `dcm4che-core` 的可交换文件协议基础能力，持续接收采集值并在停止或容量滚动时生成 DICOM `.dcm`；不自研 DICOM 二进制编码，也不引入图像编解码或网络栈。片段采集由 `feature:collection` 通过可靠 `RecorderFrameSink` 接入，UI `frames` 流不用于文件落盘。
+- `foundation:device-waveform`：从聚合帧分别投影 `EcgWaveformFrame` / `RespirationWaveformFrame`，并隔离慢 UI 消费者。
 - `foundation:device-sdk`：以上能力的总壳和会话编排；业务不负责组装及转发字节流。
 - `provider:user`：用户资料模型和 ARouter Provider 契约。
 - `provider:collection`：首页采集流程检查点、事件与 ARouter Provider 契约。
-- `provider:record`：已完成采集记录模型，以及查询、保存的 ARouter Provider 契约。
+- `provider:record`：已完成采集记录及其上传/分析摘要模型，以及查询、保存的 ARouter Provider 契约。
 - `feature:home`：采集任务入口与任务列表。
 - `feature:user`：用户信息编辑页面，以及以 ARouter Provider 暴露的 Room `UserInfoProvider` 实现；用户以姓名、性别、年龄的 SHA-256 指纹关联，修改资料时切换 active/inactive。
 - `feature:questionnaire`：采集前睡眠问卷、采集后热相关症状问卷。
 - `feature:collection`：采集流程 Activity，内部包含 BLE 扫描、连接、设备状态、实时预览、2 分钟片段、本地缓存/上传、连续记录，以及采集流程状态机的 MMKV Provider 和完成记录的 Room Provider 实现；运行时权限在进入 Activity 前处理。
-- `feature:analysis`：异步 AI 分析任务及结果。
+- `feature:analysis`：上传本地 DICOM、轮询异步 AI 分析任务、恢复持久化状态并展示 Markdown 结果。
 - `debug:dokit-bluetooth`、`debug:dokit-protocol`、`debug:dokit-waveform`：仅通过
   `app` 的 `debugImplementation` 接入的 DoKit 自定义工具，分别以可拖动的 App 内悬浮卡片
   观察蓝牙原始收发、协议/指令交互和波形环形缓冲，并可进入完整详情页；不申请系统悬浮窗权限，

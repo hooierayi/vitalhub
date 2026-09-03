@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "8bad570a434d18b1505729a147cc9b78",
+    "identityHash": "dded188c2fa7ab728a4606f754d82438",
     "entities": [
       {
         "tableName": "collection_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `type` TEXT NOT NULL, `recordedAtEpochMillis` INTEGER NOT NULL, `durationMillis` INTEGER NOT NULL, `localFilePath` TEXT, `userFingerprint` TEXT NOT NULL, `deviceAddress` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `type` TEXT NOT NULL, `recordedAtEpochMillis` INTEGER NOT NULL, `durationMillis` INTEGER NOT NULL, `localFilePath` TEXT, `userFingerprint` TEXT NOT NULL, `deviceAddress` TEXT NOT NULL, `analysisId` TEXT, `analysisStatus` TEXT, `analysisResultMarkdown` TEXT, `analysisErrorCode` INTEGER, `analysisErrorMessage` TEXT, `analysisUpdatedAtEpochMillis` INTEGER, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -55,6 +55,42 @@
             "columnName": "deviceAddress",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "analysisId",
+            "columnName": "analysisId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "analysisStatus",
+            "columnName": "analysisStatus",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "analysisResultMarkdown",
+            "columnName": "analysisResultMarkdown",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "analysisErrorCode",
+            "columnName": "analysisErrorCode",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "analysisErrorMessage",
+            "columnName": "analysisErrorMessage",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "analysisUpdatedAtEpochMillis",
+            "columnName": "analysisUpdatedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -107,7 +143,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8bad570a434d18b1505729a147cc9b78')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dded188c2fa7ab728a4606f754d82438')"
     ]
   }
 }

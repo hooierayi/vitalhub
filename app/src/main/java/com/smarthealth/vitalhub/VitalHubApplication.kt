@@ -21,6 +21,7 @@ class VitalHubApplication : Application() {
                     .setFilter { true }
                     .build(),
             )
+            .setSpiltWriteSize(50)
             .init()
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
             ARouter.openLog()

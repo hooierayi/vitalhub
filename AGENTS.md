@@ -115,6 +115,7 @@
 | `:core:navi` | 路由契约、导航宿主接口、返回策略与导航去重 | 基础层 | 根 `AGENTS.md` |
 | `:core:permission` | 可注入的运行时权限契约、检查、申请、端内兜底弹窗与设置页跳转 | 基础层 | 根 `AGENTS.md` |
 | `:core:storage` | 通用键值存储抽象及 SharedPreferences/MMKV 实现 | 基础层 | 根 `AGENTS.md` |
+| `:core:network` | Retrofit、OkHttp、JSON 转换、动态请求头与可控日志的网络基础能力 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:bluetooth` | 经典蓝牙与 BLE 的扫描、连接、读写及事件回调基础能力 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-waveform-ui` | 物理心电图纸、实时波形环形缓冲、扫屏/滚动与 ECG/呼吸 Compose 组件 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-api` | 设备 SDK、会话、聚合帧、命令和状态稳定契约 | 基础层 | 根 `AGENTS.md` |
@@ -122,18 +123,18 @@
 | `:foundation:device-protocol` | 环形缓冲、拦截器拆包、校验、连续性和聚合帧解析 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-command` | 有界优先级队列、单飞指令、回执和超时重试 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-storage` | 解析后聚合帧的异步文件记录 | 基础层 | 根 `AGENTS.md` |
-| `:foundation:device-waveform` | ECG/呼吸波形投影和慢消费者隔离 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:file-protocol` | 可交换文件协议基础能力，首要方向为 DICOM `.dcm` 生成 | 基础层 | 根 `AGENTS.md` |
+| `:foundation:device-waveform` | ECG/呼吸波形投影和慢消费者隔离 | 基础层 | 根 `AGENTS.md` |
 | `:foundation:device-sdk` | 设备能力总壳、会话编排和自动分发 | 基础层 | 根 `AGENTS.md` |
 | `:provider:user` | 用户资料的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:collection` | 采集流程进度的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
 | `:provider:device` | 最近成功连接设备及设备内部写卡记录的数据模型与提供者契约 | Provider 层 | 根 `AGENTS.md` |
-| `:provider:record` | 已完成采集记录的数据模型与查询、保存契约 | Provider 层 | 根 `AGENTS.md` |
+| `:provider:record` | 已完成采集记录及上传/分析摘要的数据模型与查询、保存契约 | Provider 层 | 根 `AGENTS.md` |
 | `:feature:home` | 采集任务入口与任务列表 | 业务 feature | 根 `AGENTS.md` |
 | `:feature:user` | 用户资料编辑与本地资料实现 | 业务 feature | `feature/user/AGENTS.md` |
 | `:feature:questionnaire` | 采集前后问卷 | 业务 feature | 根 `AGENTS.md` |
 | `:feature:collection` | BLE 权限、扫描、连接、实时预览、片段、连续记录、采集进度及 Room 记录 Provider 实现 | 业务 feature | 根 `AGENTS.md` |
-| `:feature:analysis` | 异步分析任务及结果 | 业务 feature | 根 `AGENTS.md` |
+| `:feature:analysis` | DICOM 上传、异步分析任务轮询、状态恢复及 Markdown 结果 | 业务 feature | 根 `AGENTS.md` |
 | `:debug:dokit-bluetooth` | DoKit 蓝牙连接与原始收发数据面板，仅由 app debug 变体打包 | Debug 工具层 | 根 `AGENTS.md` |
 | `:debug:dokit-protocol` | DoKit 协议拆包、恢复、指令与回执面板，仅由 app debug 变体打包 | Debug 工具层 | 根 `AGENTS.md` |
 | `:debug:dokit-waveform` | DoKit ECG/呼吸环形缓冲状态面板，仅由 app debug 变体打包 | Debug 工具层 | 根 `AGENTS.md` |

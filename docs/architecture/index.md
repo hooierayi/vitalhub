@@ -47,6 +47,7 @@ graph TD
     collection --> waveformUi[":foundation:device-waveform-ui"]
     app --> navi[":core:navi"]
     app --> permission[":core:permission"]
+    network[":core:network"]
     app --> bluetooth[":foundation:bluetooth"]
     deviceTransport[":foundation:device-transport"] --> bluetooth
     deviceSdk[":foundation:device-sdk"] --> deviceApi[":foundation:device-api"]
@@ -54,15 +55,15 @@ graph TD
     deviceSdk --> deviceProtocol[":foundation:device-protocol"]
     deviceSdk --> deviceCommand[":foundation:device-command"]
     deviceSdk --> deviceWaveform[":foundation:device-waveform"]
-    deviceCommand --> deviceTransport
     fileProtocol[":foundation:file-protocol"]
+    deviceCommand --> deviceTransport
     userFeature --> storage[":core:storage"]
     app --> home[":feature:home"]
     app --> userFeature[":feature:user"]
     app --> questionnaire[":feature:questionnaire"]
     app --> collection[":feature:collection"]
-    app --> analysis[":feature:analysis"]
     collection --> fileProtocol
+    app --> analysis[":feature:analysis"]
     app -. debug only .-> dokitBluetooth[":debug:dokit-bluetooth"]
     app -. debug only .-> dokitProtocol[":debug:dokit-protocol"]
     app -. debug only .-> dokitWaveform[":debug:dokit-waveform"]
@@ -85,6 +86,8 @@ graph TD
     questionnaire --> collectionProvider
     analysis --> common
     analysis --> navi
+    analysis --> network
+    analysis --> recordProvider
     userFeature --> common
     userFeature --> navi
     userFeature --> userProvider
@@ -99,6 +102,7 @@ graph TD
 | `:core:navi` | Android library | common、AppCompat、Fragment、ARouter API | app、provider、全部 feature | Activity/Fragment 路由契约、返回策略与导航宿主的全局影响 |
 | `:core:permission` | Android library | AndroidX Core、Fragment | app（配置注入） | 可注入权限定义、检查、申请、端内兜底弹窗和设置页跳转的全局影响 |
 | `:core:storage` | Android library | AndroidX Core、MMKV | collection | 通用本地键值存储与加密策略 |
+| `:core:network` | Android library | Retrofit、OkHttp、Gson converter | 后续接入网络的 feature | HTTP 客户端配置、动态请求头、序列化与日志策略的全局影响 |
 | `:foundation:bluetooth` | Android library | AndroidX AppCompat | app、feature:collection | 经典蓝牙与 BLE 扫描、连接、读写及事件回调基础能力；由 app 在 Application 中完成全局配置 |
 | `:foundation:device-waveform-ui` | Android library | Compose | feature:collection（及后续回放/分析页面） | 物理图纸标定、实时波形缓冲和绘制策略 |
 | `:foundation:device-api` | Android library | Coroutines | device-*、collection | 设备会话、聚合帧、命令与消费流稳定契约 |
@@ -112,12 +116,12 @@ graph TD
 | `:provider:user` | Android library | ARouter API | app、home、collection、analysis、feature:user | 用户资料、指纹及历史关联查询契约的影响面 |
 | `:provider:collection` | Android library | navi、ARouter API | home、questionnaire、collection | 采集流程状态机契约的影响面 |
 | `:provider:device` | Android library | ARouter API、bluetooth | collection、analysis | 最近成功连接设备的 `DeviceInfo`、内部写卡记录及兼容设备对象契约 |
-| `:provider:record` | Android library | ARouter API、Coroutines | app、collection | 已完成采集记录的查询、观察与保存契约 |
+| `:provider:record` | Android library | ARouter API、Coroutines | app、collection、analysis | 已完成采集记录及上传/分析摘要的查询、观察与保存契约 |
 | `:feature:home` | Android library | common、navi、provider:user、provider:collection | app | 采集入口与任务列表 |
 | `:feature:user` | Android library | common、navi、provider:user、Room | app | 用户资料 Activity、内部 Fragment 与 Room 用户资料实现 |
 | `:feature:questionnaire` | Android library | common、navi、provider:collection | app | 前后问卷 Activity 与内部 Fragment |
-| `:feature:collection` | Android library | common、device-waveform-ui、navi、storage、foundation:bluetooth、device-api、device-sdk、provider:collection、provider:device、provider:record、Room | app | BLE 设备、采集 Activity、内部 Fragment、完成记录与流程状态机实现 |
-| `:feature:analysis` | Android library | common、navi | app | 分析 Activity 与内部 Fragment |
+| `:feature:collection` | Android library | common、device-waveform-ui、navi、storage、foundation:bluetooth、device-api、device-sdk、file-protocol、provider:collection、provider:device、provider:record、Room | app | BLE 设备、采集 Activity、内部 Fragment、DICOM 片段文件、完成记录与流程状态机实现 |
+| `:feature:analysis` | Android library | common、navi、network、record/user/device/collection Provider、Retrofit、OkHttp | app | DICOM multipart 上传、异步任务轮询、状态恢复与 Markdown 结果页面 |
 | `:debug:dokit-bluetooth` | Android library（debug only） | device-api、DoKit | app debug | 蓝牙连接、完整原始 RX/TX 数据调试面板 |
 | `:debug:dokit-protocol` | Android library（debug only） | device-api、DoKit | app debug | 协议缓冲、拆包恢复、指令及回执调试面板 |
 | `:debug:dokit-waveform` | Android library（debug only） | device-waveform-ui、DoKit | app debug | ECG/呼吸环形缓冲容量、游标、覆盖和采样范围调试面板 |
@@ -130,14 +134,15 @@ graph TD
 - `:core:navi` 是跨模块导航基础层，暴露 `Routes`、`Navigator`、`BaseFlowActivity`、导航宿主接口、页面元数据与导航去重；不依赖业务 feature。
 - `:core:permission` 是跨模块基础层，封装可注入的运行时权限契约、检查、申请、端内拒绝兜底弹窗及设置页跳转；应用层配置权限定义、路由守卫和宿主依赖，功能模块仅在各自 Manifest 声明所需权限。
 - `:core:storage` 是跨模块基础层，封装本地键值存储；业务模块只依赖其公开的 `KVStorage`/`Storage` API，不直接依赖具体存储后端。
+- `:core:network` 是跨模块网络基础层，封装 Retrofit/OkHttp 的组装、Gson 转换、超时、动态请求头与可控日志；服务端 base URL、接口及 DTO 留在所属 feature，日志默认关闭，启用时默认隐藏鉴权与 Cookie 请求头。
 - `:foundation:bluetooth` 是蓝牙基础能力层，封装经典蓝牙与 BLE 的扫描、连接、读写和回调，不依赖业务 feature。
 - `:foundation:device-*` 按 API、传输、协议、指令、存储、波形和总壳拆分；协议层持有环形缓冲和通用拦截器外层，总壳把解析后的同一聚合帧自动分发给不同消费者。
+- `:foundation:file-protocol` 是独立的可交换文件协议基础层；持续写入期间使用带 checkpoint 的可恢复 staging，在封口或达到容量上限时使用 `dcm4che-core` 生成 DICOM Part 10 文件。staging 的恢复信息不进入最终 DICOM。模块不依赖设备链路或业务模块，不引入图像编解码和 DICOM 网络栈；一次连续采集仅在容量滚动时产生同一 Study/Series 下的多个 SOP Instance。
 - `:app` 在 `VitalHubApplication` 中统一初始化 `BluetoothKit` 及扫描规则；业务 feature 只获取并使用已初始化的单例。
 - `:provider:user` 是继承 `IProvider` 的用户资料能力契约层；`:feature:user` 负责资料编辑、Room 用户表、指纹与 active/inactive 状态切换及 `/user/service` ARouter 服务注册。
 - `:provider:collection` 是继承 `IProvider` 的采集流程状态机契约层；`:feature:collection` 负责 MMKV 实现及 `/collection/flow/service` 服务注册。
 - `:provider:device` 是继承 `IProvider` 的最近连接设备契约层；Parcelable `DeviceInfo` 保存设备名称、MAC 和可选的设备内部写卡 `DeviceRecordInfo`，并通过 `getRecordInfo()` 单独暴露写卡记录。`:feature:collection` 将其作为单个对象持久化，负责 MMKV 实现及 `/device/service` 服务注册；写入统一使用 `saveDevice(DeviceInfo)`，旧层仅保留设备对象、名称和 MAC 查询接口。
 - `:provider:record` 是继承 `IProvider` 的完成记录契约层；`:feature:collection` 负责 Room 实现及 `/record/service` 服务注册，`:app` 只通过契约查询。
-- `:foundation:file-protocol` 是独立的可交换文件协议基础层；持续写入期间使用带 checkpoint 的可恢复 staging，在封口或达到容量上限时使用 `dcm4che-core` 生成 DICOM Part 10 文件。staging 的恢复信息不进入最终 DICOM。模块不依赖设备链路或业务模块，不引入图像编解码和 DICOM 网络栈；一次连续采集仅在容量滚动时产生同一 Study/Series 下的多个 SOP Instance。
 - feature 模块不直接依赖彼此，使用 ARouter 路径经 `Navigator` 跳转。
 - 三个 `:debug:dokit-*` 模块只消费 foundation 暴露的惰性调试快照，不被业务模块依赖；工具以宿主 Activity 内可拖动的数据卡片展示并保留完整详情页，不申请系统悬浮窗权限。DoKit SDK 只存在于 app debug 运行时，release 不打包悬浮卡片或面板 Activity。
 

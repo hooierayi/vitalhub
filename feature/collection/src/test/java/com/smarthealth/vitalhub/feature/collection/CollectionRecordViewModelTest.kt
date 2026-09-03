@@ -21,7 +21,7 @@ class CollectionRecordViewModelTest {
                 ),
             ),
         )
-        viewModel.markLocalRecordingStarted("/records/clip.vhf")
+        viewModel.markLocalRecordingStarted("/records/clip.dcm")
 
         val record = viewModel.completedRecord(
             userFingerprint = "user-fingerprint",
@@ -31,7 +31,7 @@ class CollectionRecordViewModelTest {
         assertNotNull(record)
         assertEquals("session-1", record?.sessionId)
         assertEquals(RecordType.CLIP, record?.type)
-        assertEquals("/records/clip.vhf", record?.localFilePath)
+        assertEquals("/records/clip.dcm", record?.localFilePath)
         assertEquals("user-fingerprint", record?.userFingerprint)
         assertEquals("AA:BB:CC:DD:EE:FF", record?.deviceAddress)
     }
