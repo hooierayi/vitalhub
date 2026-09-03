@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -35,11 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarthealth.vitalhub.core.navi.BottomNavigationKeys
 import com.smarthealth.vitalhub.core.ui.*
-import com.smarthealth.vitalhub.provider.record.CollectionRecord
 import com.smarthealth.vitalhub.provider.record.RecordType
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun AppSectionScreen(
@@ -74,17 +69,12 @@ fun AppSectionScreen(
                 ) {
                     items(
                         items = state.records,
-                        key = CollectionRecord::id,
-                        contentType = CollectionRecord::type,
+                        key = RecordListItemUi::id,
+                        contentType = RecordListItemUi::type,
                     ) { record ->
                         CollectionRecordCard(
-                            type = record.type,
-                            recordId = record.id,
+                            record = record,
                             onClick = { onRecordClick(record.id) },
-                            recordedAtEpochMillis = record.recordedAtEpochMillis,
-                            durationMillis = record.durationMillis,
-                            userName = state.userNamesByFingerprint[record.userFingerprint],
-                            deviceAddress = record.deviceAddress,
                         )
                     }
                 }
@@ -103,20 +93,9 @@ private fun RecordMessageCard(message: String, color: androidx.compose.ui.graphi
 
 @Composable
 private fun CollectionRecordCard(
-    type: RecordType,
-    recordId: String,
+    record: RecordListItemUi,
     onClick: () -> Unit,
-    recordedAtEpochMillis: Long,
-    durationMillis: Long,
-    userName: String?,
-    deviceAddress: String,
 ) {
-    val recordedAt = remember(recordedAtEpochMillis) {
-        formatRecordDate(recordedAtEpochMillis)
-    }
-    val duration = remember(durationMillis) {
-        formatRecordDuration(durationMillis)
-    }
     InfoCard(
         modifier = Modifier.clickable(role = Role.Button, onClick = onClick),
         padding = PaddingValues(18.dp),
@@ -129,7 +108,7 @@ private fun CollectionRecordCard(
             RecordTypeIcon()
             Spacer(Modifier.width(12.dp))
             Text(
-                text = if (type == RecordType.CLIP) "片段采集" else "连续记录",
+                text = if (record.type == RecordType.CLIP) "片段采集" else "连续记录",
                 modifier = Modifier.weight(1f),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -148,7 +127,7 @@ private fun CollectionRecordCard(
             Text("记录编号", fontSize = 13.sp, color = VitalColors.TextSecondary)
             Spacer(Modifier.height(5.dp))
             Text(
-                text = recordId,
+                text = record.id,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = FontFamily.Monospace,
@@ -165,7 +144,7 @@ private fun CollectionRecordCard(
         ) {
             RecordSummary(
                 label = "完成时间",
-                value = recordedAt,
+                value = record.recordedAt,
                 modifier = Modifier.weight(1.45f),
             )
             Box(
@@ -177,16 +156,16 @@ private fun CollectionRecordCard(
             )
             RecordSummary(
                 label = "采集时长",
-                value = duration,
+                value = record.duration,
                 modifier = Modifier.weight(.75f),
             )
         }
 
         Spacer(Modifier.height(16.dp))
         RecordDivider()
-        RecordMetadataRow("采集人", userName?.takeIf(String::isNotBlank) ?: "-")
+        RecordMetadataRow("采集人", record.userName)
         RecordDivider()
-        RecordMetadataRow("记录仪 MAC", deviceAddress.takeIf(String::isNotBlank) ?: "-")
+        RecordMetadataRow("记录仪 MAC", record.deviceAddress)
     }
 }
 
@@ -282,26 +261,4 @@ private fun RecordMetadataRow(label: String, value: String) {
 @Composable
 private fun RecordDivider() {
     Box(Modifier.fillMaxWidth().height(1.dp).background(VitalColors.Border))
-}
-
-private val recordDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
-    override fun initialValue(): SimpleDateFormat = SimpleDateFormat(
-        "yyyy-MM-dd HH:mm:ss",
-        Locale.getDefault(),
-    )
-}
-
-private fun formatRecordDate(epochMillis: Long): String =
-    checkNotNull(recordDateFormatter.get()).format(Date(epochMillis))
-
-private fun formatRecordDuration(durationMillis: Long): String {
-    val totalSeconds = durationMillis.coerceAtLeast(0L) / 1_000L
-    val hours = totalSeconds / 3_600L
-    val minutes = totalSeconds % 3_600L / 60L
-    val seconds = totalSeconds % 60L
-    return if (hours > 0L) {
-        "%02d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%02d:%02d".format(minutes, seconds)
-    }
 }
