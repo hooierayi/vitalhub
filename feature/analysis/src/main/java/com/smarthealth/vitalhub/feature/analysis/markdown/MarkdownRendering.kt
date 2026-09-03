@@ -1,5 +1,6 @@
 package com.smarthealth.vitalhub.feature.analysis
 
+import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -12,8 +13,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
-import android.os.Bundle
-import android.text.util.Linkify
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -23,6 +22,7 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.SuperscriptSpan
 import android.text.style.TypefaceSpan
+import android.text.util.Linkify
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -30,8 +30,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.WindowInsetsControllerCompat
 import coil.ImageLoader
 import coil.decode.GifDecoder
 import coil.decode.SvgDecoder
@@ -40,13 +38,13 @@ import io.noties.markwon.AbstractMarkwonPlugin
 import io.noties.markwon.LinkResolver
 import io.noties.markwon.LinkResolverDef
 import io.noties.markwon.MarkwonConfiguration
-import io.noties.markwon.MarkwonPlugin
 import io.noties.markwon.Markwon
-import io.noties.markwon.SoftBreakAddsNewLinePlugin
+import io.noties.markwon.MarkwonPlugin
 import io.noties.markwon.MarkwonSpansFactory
 import io.noties.markwon.RenderProps
 import io.noties.markwon.SpanFactory
 import io.noties.markwon.SpannableBuilder
+import io.noties.markwon.SoftBreakAddsNewLinePlugin
 import io.noties.markwon.core.CorePlugin
 import io.noties.markwon.core.CoreProps
 import io.noties.markwon.core.MarkwonTheme
@@ -333,7 +331,7 @@ internal fun createMarkdownRenderer(context: Context): Markwon {
             ),
         )
         .usePlugin(CoilImagesPlugin.create(context, createMarkdownImageLoader(context)))
-        .usePlugin(MarkdownImagePlugin.create(context))
+        .usePlugin(MarkdownImagePlugin.create())
         .usePlugin(HtmlPlugin.create { it.addHandler(MarkdownKbdTagHandler()) })
         .usePlugin(LinkifyPlugin.create(Linkify.WEB_URLS))
         .usePlugin(MarkdownEmailLinkPlugin.create())
@@ -516,8 +514,8 @@ private class MarkdownLinkResolver : LinkResolver {
     }.getOrDefault(false)
 }
 
-internal class MarkdownImagePlugin private constructor(context: Context) : AbstractMarkwonPlugin() {
-    private val imageSizeResolver = UniformImageSizeResolver(context)
+internal class MarkdownImagePlugin private constructor() : AbstractMarkwonPlugin() {
+    private val imageSizeResolver = ResponsiveImageSizeResolver()
     private val pendingAnimations = WeakHashMap<TextView, Runnable>()
     private val trimmedSvgDrawables = Collections.newSetFromMap(WeakHashMap<AsyncDrawable, Boolean>())
 
@@ -552,8 +550,8 @@ internal class MarkdownImagePlugin private constructor(context: Context) : Abstr
                         result = trimTransparentPadding(result, textView)?.also(drawable::setResult)
                             ?: result
                     }
-                    if (result != null && result !is UniformMarkdownDrawable) {
-                        result = UniformMarkdownDrawable(result).also(drawable::setResult)
+                    if (result != null && result !is AspectFitMarkdownDrawable) {
+                        result = AspectFitMarkdownDrawable(result).also(drawable::setResult)
                     }
                     if (result is Animatable) {
                         if (!result.isRunning) result.start()
@@ -640,32 +638,51 @@ internal class MarkdownImagePlugin private constructor(context: Context) : Abstr
         private const val SVG_RENDER_MAX_SIZE = 1024
         private const val MIN_VISIBLE_ALPHA = 8
 
-        fun create(context: Context): MarkdownImagePlugin = MarkdownImagePlugin(context)
+        fun create(): MarkdownImagePlugin = MarkdownImagePlugin()
     }
 }
 
-private class UniformImageSizeResolver(context: Context) : ImageSizeResolver() {
-    private val preferredWidthPx = context.dp(320f)
-    private val preferredHeightPx = context.dp(200f)
-
+private class ResponsiveImageSizeResolver : ImageSizeResolver() {
     override fun resolveImageSize(drawable: AsyncDrawable): Rect {
-        val availableWidth = drawable.lastKnownCanvasWidth.takeIf { it > 0 } ?: preferredWidthPx
-        return Rect(0, 0, minOf(availableWidth, preferredWidthPx), preferredHeightPx)
+        val result = drawable.result
+        val sourceWidth = maxOf(result?.intrinsicWidth ?: drawable.bounds.width(), 1)
+        val sourceHeight = maxOf(result?.intrinsicHeight ?: drawable.bounds.height(), 1)
+        val availableWidth = drawable.lastKnownCanvasWidth.takeIf { it > 0 } ?: sourceWidth
+        val sourceRatio = sourceWidth.toFloat() / sourceHeight
+        val layoutRatio = sourceRatio.coerceIn(MIN_LAYOUT_RATIO, MAX_LAYOUT_RATIO)
+        return Rect(0, 0, availableWidth, (availableWidth / layoutRatio).roundToInt())
+    }
+
+    private companion object {
+        const val MIN_LAYOUT_RATIO = 0.8f
+        const val MAX_LAYOUT_RATIO = 2.4f
     }
 }
 
-private class UniformMarkdownDrawable(private val source: Drawable) : Drawable(), Animatable,
+private class AspectFitMarkdownDrawable(private val source: Drawable) : Drawable(), Animatable,
     Drawable.Callback {
     init {
         source.callback = this
     }
 
     override fun draw(canvas: Canvas) {
-        // Markdown media shares one fixed frame so small GIF assets do not render as
-        // thumbnails beside larger PNG/SVG sources.
-        source.bounds = bounds
+        val sourceWidth = maxOf(source.intrinsicWidth, 1)
+        val sourceHeight = maxOf(source.intrinsicHeight, 1)
+        val scale = minOf(
+            bounds.width().toFloat() / sourceWidth,
+            bounds.height().toFloat() / sourceHeight,
+        )
+        val width = (sourceWidth * scale).roundToInt()
+        val height = (sourceHeight * scale).roundToInt()
+        val left = bounds.left + (bounds.width() - width) / 2
+        val top = bounds.top + (bounds.height() - height) / 2
+        source.setBounds(left, top, left + width, top + height)
         source.draw(canvas)
     }
+
+    override fun getIntrinsicWidth(): Int = source.intrinsicWidth
+
+    override fun getIntrinsicHeight(): Int = source.intrinsicHeight
 
     override fun setAlpha(alpha: Int) {
         source.alpha = alpha
@@ -698,83 +715,78 @@ private class UniformMarkdownDrawable(private val source: Drawable) : Drawable()
 
 private class MarkdownImageClickSpan(private val imageUrl: String) : android.text.style.ClickableSpan() {
     override fun onClick(widget: View) {
-        widget.context.startActivity(
-            Intent(widget.context, MarkdownImagePreviewActivity::class.java)
-                .putExtra(MarkdownImagePreviewActivity.EXTRA_URL, imageUrl),
-        )
+        showMarkdownImageDialog(widget.context, imageUrl)
     }
 
     override fun updateDrawState(ds: TextPaint) = Unit
 }
 
-class MarkdownImagePreviewActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.BLACK
-        window.navigationBarColor = android.graphics.Color.BLACK
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
+private fun showMarkdownImageDialog(context: Context, imageUrl: String) {
+    val dialog = Dialog(context)
+    val imageView = ImageView(context).apply {
+        scaleType = ImageView.ScaleType.FIT_CENTER
+        contentDescription = "Markdown 图片预览"
+    }
+    val imageContainer = FrameLayout(context).apply {
+        background = GradientDrawable().apply {
+            color = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+            cornerRadius = context.dp(12f).toFloat()
         }
-
-        val imageView = ImageView(this).apply {
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            contentDescription = "Markdown 图片预览"
-        }
-        val imageContainer = FrameLayout(this).apply {
-            background = GradientDrawable().apply {
-                color = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-                cornerRadius = dp(12f).toFloat()
-            }
+        addView(
+            imageView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+    }
+    val close = TextView(context).apply {
+        text = "×"
+        textSize = 28f
+        gravity = Gravity.CENTER
+        setTextColor(MARKDOWN_CODE_TEXT_COLOR)
+        contentDescription = "关闭图片预览"
+        setOnClickListener { dialog.dismiss() }
+    }
+    dialog.setContentView(
+        FrameLayout(context).apply {
+            setPadding(context.dp(16f), context.dp(16f), context.dp(16f), context.dp(16f))
             addView(
-                imageView,
+                imageContainer,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    (resources.displayMetrics.heightPixels * 0.72f).roundToInt(),
                 ),
             )
-        }
-        val close = TextView(this).apply {
-            text = "×"
-            textSize = 32f
-            gravity = Gravity.CENTER
-            setTextColor(android.graphics.Color.WHITE)
-            contentDescription = "关闭图片预览"
-            setOnClickListener { finish() }
-        }
-        setContentView(
-            FrameLayout(this).apply {
-                setBackgroundColor(android.graphics.Color.BLACK)
-                addView(
-                    imageContainer,
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                    ).apply {
-                        setMargins(dp(16f), dp(72f), dp(16f), dp(72f))
-                    },
-                )
-                addView(
-                    close,
-                    FrameLayout.LayoutParams(dp(56f), dp(56f), Gravity.TOP or Gravity.END).apply {
-                        topMargin = dp(28f)
-                        marginEnd = dp(8f)
-                    },
-                )
-            },
-        )
-
-        createMarkdownImageLoader(this).enqueue(
-            ImageRequest.Builder(this)
-                .data(intent.getStringExtra(EXTRA_URL).orEmpty())
-                .target(imageView)
-                .build(),
+            addView(
+                close,
+                FrameLayout.LayoutParams(
+                    context.dp(48f),
+                    context.dp(48f),
+                    Gravity.TOP or Gravity.END,
+                ),
+            )
+        },
+    )
+    dialog.setCanceledOnTouchOutside(true)
+    dialog.show()
+    dialog.window?.apply {
+        setBackgroundDrawableResource(android.R.color.transparent)
+        setDimAmount(0.72f)
+        addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        setLayout(
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+            android.view.WindowManager.LayoutParams.WRAP_CONTENT,
         )
     }
-
-    companion object {
-        const val EXTRA_URL = "markdownImageUrl"
-    }
+    val imageLoader = createMarkdownImageLoader(context)
+    val request = imageLoader.enqueue(
+        ImageRequest.Builder(context)
+            .data(imageUrl)
+            .target(imageView)
+            .build(),
+    )
+    dialog.setOnDismissListener { request.dispose() }
 }
 
 internal fun createMarkdownImageLoader(context: Context): ImageLoader = ImageLoader.Builder(context)
