@@ -1,6 +1,7 @@
 package com.smarthealth.vitalhub.foundation.device.waveform.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class WaveformConfigTest {
@@ -25,6 +26,16 @@ class WaveformConfigTest {
         assertEquals(6.25f, config.paperSpeed.millimetersPerSecond, 0.0001f)
         assertEquals(0.025f, config.sampleSpacingMillimeters, 0.0001f)
         assertEquals(40f, config.samplesPerSmallGrid, 0.0001f)
+    }
+
+    @Test
+    fun viewportHeightUsageMustStayWithinCanvasBounds() {
+        assertThrows(IllegalArgumentException::class.java) {
+            WaveformPaperConfig(viewportHeightUsage = 0f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            WaveformPaperConfig(viewportHeightUsage = 1.01f)
+        }
     }
 
     @Test

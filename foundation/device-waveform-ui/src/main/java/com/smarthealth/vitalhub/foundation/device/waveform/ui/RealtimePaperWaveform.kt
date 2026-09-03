@@ -115,6 +115,7 @@ fun RespirationWaveform(
     paperSpeed: PaperSpeed = PaperSpeed.MM_6_25_PER_SECOND,
     gain: PaperGain = PaperGain.MM_10_PER_MV,
     gainMode: WaveformGainMode = WaveformGainMode.FIT_VISIBLE_RANGE,
+    viewportHeightUsage: Float = RESPIRATION_VIEWPORT_HEIGHT_USAGE,
     physicalMetrics: PhysicalPaperMetrics = rememberPhysicalPaperMetrics(),
 ) {
     RealtimePaperWaveform(
@@ -127,6 +128,7 @@ fun RespirationWaveform(
             gainMode = gainMode,
             renderMode = renderMode,
             baselineFraction = 0.5f,
+            viewportHeightUsage = viewportHeightUsage,
             showPaperGrid = false,
             showCalibrationPulse = false,
         ),
@@ -327,7 +329,7 @@ private fun resolveGainMillimetersPerMillivolt(
         return config.gain.millimetersPerMillivolt
     }
     val baseline = canvasHeight * config.baselineFraction
-    val usableHeight = 2f * min(baseline, canvasHeight - baseline) * VIEWPORT_HEIGHT_USAGE
+    val usableHeight = 2f * min(baseline, canvasHeight - baseline) * config.viewportHeightUsage
     val rangeMillivolts = calibration.deltaToMillivolts(viewportRangeSamples)
     return when (config.gainMode) {
         WaveformGainMode.FIXED -> config.gain.millimetersPerMillivolt
@@ -343,7 +345,7 @@ private const val CALIBRATION_PULSE_SECONDS = 0.2f
 private const val CALIBRATION_BOTTOM_MARGIN_MILLIMETERS = 1f
 private const val NANOS_PER_SECOND = 1_000_000_000.0
 private const val MAX_RENDER_STEP_SECONDS = 0.1f
-private const val VIEWPORT_HEIGHT_USAGE = 0.9f
+private const val RESPIRATION_VIEWPORT_HEIGHT_USAGE = 0.35f
 private val AUTO_GAIN_CANDIDATES = listOf(
     PaperGain.MM_20_PER_MV,
     PaperGain.MM_10_PER_MV,

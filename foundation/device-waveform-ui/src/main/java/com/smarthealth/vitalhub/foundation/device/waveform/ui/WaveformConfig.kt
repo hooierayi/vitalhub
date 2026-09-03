@@ -140,6 +140,7 @@ data class WaveformPaperConfig(
     val majorGridInterval: Int = 5,
     val sweepBlankMillimeters: Float = 1f,
     val baselineFraction: Float = 0.68f,
+    val viewportHeightUsage: Float = 0.9f,
     val showPaperGrid: Boolean = true,
     val showBaseline: Boolean = true,
     val showCalibrationPulse: Boolean = true,
@@ -150,6 +151,7 @@ data class WaveformPaperConfig(
         require(majorGridInterval > 0)
         require(sweepBlankMillimeters >= 0f)
         require(baselineFraction in 0f..1f)
+        require(viewportHeightUsage > 0f && viewportHeightUsage <= 1f)
     }
 
     val sampleSpacingMillimeters: Float
