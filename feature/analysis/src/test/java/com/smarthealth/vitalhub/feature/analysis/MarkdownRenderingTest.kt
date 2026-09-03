@@ -1,5 +1,10 @@
 package com.smarthealth.vitalhub.feature.analysis
 
+import com.smarthealth.vitalhub.feature.analysis.markdown.MarkdownEmailLinkPlugin
+import com.smarthealth.vitalhub.feature.analysis.markdown.MarkdownPhoneLinkPlugin
+import com.smarthealth.vitalhub.feature.analysis.markdown.normalizeFootnotes
+import com.smarthealth.vitalhub.feature.analysis.markdown.normalizeInlineLatex
+import com.smarthealth.vitalhub.feature.analysis.markdown.splitMarkdownTables
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -1,4 +1,4 @@
-package com.smarthealth.vitalhub.feature.analysis
+package com.smarthealth.vitalhub.feature.analysis.markdown
 
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smarthealth.vitalhub.core.ui.VitalColors
 import com.smarthealth.vitalhub.core.ui.VitalHubTheme
+import com.smarthealth.vitalhub.feature.analysis.R
 import java.io.Closeable
 import java.io.File
 import java.io.IOException

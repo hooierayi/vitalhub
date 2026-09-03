@@ -58,6 +58,10 @@ import com.smarthealth.vitalhub.core.ui.VitalColors
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisFailureAction
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisTaskState
 import com.smarthealth.vitalhub.feature.analysis.data.AnalysisWaitingStatus
+import com.smarthealth.vitalhub.feature.analysis.markdown.createMarkdownRenderer
+import com.smarthealth.vitalhub.feature.analysis.markdown.normalizeFootnotes
+import com.smarthealth.vitalhub.feature.analysis.markdown.normalizeInlineLatex
+import com.smarthealth.vitalhub.feature.analysis.markdown.splitMarkdownTables
 import io.noties.markwon.Markwon
 
 private val AnalysisCardShape = RoundedCornerShape(10.dp)

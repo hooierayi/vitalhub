@@ -1,4 +1,4 @@
-package com.smarthealth.vitalhub.feature.analysis
+package com.smarthealth.vitalhub.feature.analysis.markdown
 
 import android.app.Dialog
 import android.content.Context
@@ -551,7 +551,13 @@ internal class MarkdownImagePlugin private constructor() : AbstractMarkwonPlugin
                             ?: result
                     }
                     if (result != null && result !is AspectFitMarkdownDrawable) {
-                        result = AspectFitMarkdownDrawable(result).also(drawable::setResult)
+                        val visibleBounds = if (result is Animatable) {
+                            findVisibleContentBounds(result)
+                        } else {
+                            null
+                        }
+                        result = AspectFitMarkdownDrawable(result, visibleBounds)
+                            .also(drawable::setResult)
                     }
                     if (result is Animatable) {
                         if (!result.isRunning) result.start()
@@ -631,11 +637,72 @@ internal class MarkdownImagePlugin private constructor() : AbstractMarkwonPlugin
         }
     }
 
+    private fun findVisibleContentBounds(result: Drawable): Rect? {
+        val sourceWidth = result.intrinsicWidth.takeIf { it > 0 }
+            ?: result.bounds.width().coerceAtLeast(1)
+        val sourceHeight = result.intrinsicHeight.takeIf { it > 0 }
+            ?: result.bounds.height().coerceAtLeast(1)
+        val renderScale = minOf(
+            GIF_BOUNDS_RENDER_MAX_SIZE.toFloat() / maxOf(sourceWidth, sourceHeight),
+            1f,
+        )
+        val renderWidth = (sourceWidth * renderScale).roundToInt().coerceAtLeast(1)
+        val renderHeight = (sourceHeight * renderScale).roundToInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
+        val previousBounds = Rect(result.bounds)
+        result.setBounds(0, 0, renderWidth, renderHeight)
+        result.draw(Canvas(bitmap))
+        result.bounds = previousBounds
+
+        val renderedBounds = bitmap.visiblePixelBounds()
+        bitmap.recycle()
+        if (renderedBounds == null) return null
+        val contentBounds = Rect(
+            (renderedBounds.left / renderScale).toInt().coerceAtLeast(0),
+            (renderedBounds.top / renderScale).toInt().coerceAtLeast(0),
+            kotlin.math.ceil(renderedBounds.right / renderScale).toInt().coerceAtMost(sourceWidth),
+            kotlin.math.ceil(renderedBounds.bottom / renderScale).toInt().coerceAtMost(sourceHeight),
+        )
+        if (contentBounds.width() <= 0 || contentBounds.height() <= 0) return null
+        val horizontalPadding = (contentBounds.width() * GIF_MOTION_PADDING_RATIO).roundToInt()
+        val verticalPadding = (contentBounds.height() * GIF_MOTION_PADDING_RATIO).roundToInt()
+        return Rect(
+            (contentBounds.left - horizontalPadding).coerceAtLeast(0),
+            (contentBounds.top - verticalPadding).coerceAtLeast(0),
+            (contentBounds.right + horizontalPadding).coerceAtMost(sourceWidth),
+            (contentBounds.bottom + verticalPadding).coerceAtMost(sourceHeight),
+        )
+    }
+
+    private fun Bitmap.visiblePixelBounds(): Rect? {
+        var left = width
+        var top = height
+        var right = -1
+        var bottom = -1
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                if (getPixel(x, y).ushr(24) > MIN_VISIBLE_ALPHA) {
+                    left = minOf(left, x)
+                    top = minOf(top, y)
+                    right = maxOf(right, x)
+                    bottom = maxOf(bottom, y)
+                }
+            }
+        }
+        return if (right >= left && bottom >= top) {
+            Rect(left, top, right + 1, bottom + 1)
+        } else {
+            null
+        }
+    }
+
     companion object {
         private const val MAX_START_ATTEMPTS = 100
         private const val START_RETRY_MILLIS = 100L
         private const val SVG_RENDER_MIN_SIZE = 256
         private const val SVG_RENDER_MAX_SIZE = 1024
+        private const val GIF_BOUNDS_RENDER_MAX_SIZE = 512
+        private const val GIF_MOTION_PADDING_RATIO = 0.12f
         private const val MIN_VISIBLE_ALPHA = 8
 
         fun create(): MarkdownImagePlugin = MarkdownImagePlugin()
@@ -659,30 +726,44 @@ private class ResponsiveImageSizeResolver : ImageSizeResolver() {
     }
 }
 
-private class AspectFitMarkdownDrawable(private val source: Drawable) : Drawable(), Animatable,
-    Drawable.Callback {
+private class AspectFitMarkdownDrawable(
+    private val source: Drawable,
+    visibleBounds: Rect?,
+) : Drawable(), Animatable, Drawable.Callback {
+    private val sourceWidth = source.intrinsicWidth.takeIf { it > 0 }
+        ?: source.bounds.width().coerceAtLeast(1)
+    private val sourceHeight = source.intrinsicHeight.takeIf { it > 0 }
+        ?: source.bounds.height().coerceAtLeast(1)
+    private val contentBounds = visibleBounds ?: Rect(0, 0, sourceWidth, sourceHeight)
+
     init {
         source.callback = this
     }
 
     override fun draw(canvas: Canvas) {
-        val sourceWidth = maxOf(source.intrinsicWidth, 1)
-        val sourceHeight = maxOf(source.intrinsicHeight, 1)
         val scale = minOf(
-            bounds.width().toFloat() / sourceWidth,
-            bounds.height().toFloat() / sourceHeight,
+            bounds.width().toFloat() / contentBounds.width(),
+            bounds.height().toFloat() / contentBounds.height(),
         )
-        val width = (sourceWidth * scale).roundToInt()
-        val height = (sourceHeight * scale).roundToInt()
+        val width = (contentBounds.width() * scale).roundToInt()
+        val height = (contentBounds.height() * scale).roundToInt()
         val left = bounds.left + (bounds.width() - width) / 2
         val top = bounds.top + (bounds.height() - height) / 2
-        source.setBounds(left, top, left + width, top + height)
+        val checkpoint = canvas.save()
+        canvas.clipRect(left, top, left + width, top + height)
+        canvas.translate(
+            left - contentBounds.left * scale,
+            top - contentBounds.top * scale,
+        )
+        canvas.scale(scale, scale)
+        source.setBounds(0, 0, sourceWidth, sourceHeight)
         source.draw(canvas)
+        canvas.restoreToCount(checkpoint)
     }
 
-    override fun getIntrinsicWidth(): Int = source.intrinsicWidth
+    override fun getIntrinsicWidth(): Int = contentBounds.width()
 
-    override fun getIntrinsicHeight(): Int = source.intrinsicHeight
+    override fun getIntrinsicHeight(): Int = contentBounds.height()
 
     override fun setAlpha(alpha: Int) {
         source.alpha = alpha
@@ -696,6 +777,7 @@ private class AspectFitMarkdownDrawable(private val source: Drawable) : Drawable
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 
     override fun start() {
+        source.callback = this
         (source as? Animatable)?.start()
     }
 

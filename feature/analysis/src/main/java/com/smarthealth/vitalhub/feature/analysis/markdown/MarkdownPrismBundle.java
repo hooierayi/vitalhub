@@ -1,4 +1,4 @@
-package com.smarthealth.vitalhub.feature.analysis;
+package com.smarthealth.vitalhub.feature.analysis.markdown;
 
 import io.noties.prism4j.annotations.PrismBundle;
 
