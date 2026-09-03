@@ -1,6 +1,7 @@
 package com.smarthealth.vitalhub.feature.analysis
 
 import android.util.TypedValue
+import android.text.Spanned
 import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,9 +34,12 @@ import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +67,8 @@ import com.smarthealth.vitalhub.feature.analysis.markdown.normalizeFootnotes
 import com.smarthealth.vitalhub.feature.analysis.markdown.normalizeInlineLatex
 import com.smarthealth.vitalhub.feature.analysis.markdown.splitMarkdownTables
 import io.noties.markwon.Markwon
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val AnalysisCardShape = RoundedCornerShape(10.dp)
 private val AnalysisCardBorder = Color(0xFFD7E1E7)
@@ -275,10 +281,21 @@ private fun AnalysisReportCard(markdown: String) {
     val markwon = remember(context) {
         createMarkdownRenderer(context)
     }
-    val content = normalizeInlineLatex(
-        normalizeFootnotes(markdown.ifBlank { "服务器未返回报告内容" }),
-    )
+    val content = remember(markdown) {
+        normalizeInlineLatex(
+            normalizeFootnotes(markdown.ifBlank { "服务器未返回报告内容" }),
+        )
+    }
     val blocks = remember(content) { splitMarkdownTables(content) }
+    val renderedBlocks by produceState<List<Spanned>?>(
+        initialValue = null,
+        markwon,
+        blocks,
+    ) {
+        value = withContext(Dispatchers.Default) {
+            blocks.map { markwon.toMarkdown(it.markdown) }
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,7 +303,21 @@ private fun AnalysisReportCard(markdown: String) {
             .border(1.dp, AnalysisCardBorder, AnalysisCardShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        blocks.forEach { block ->
+        val rendered = renderedBlocks
+        if (rendered == null) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    color = VitalColors.Teal,
+                    strokeWidth = 2.dp,
+                )
+            }
+            return@Column
+        }
+        blocks.zip(rendered).forEach { (block, spanned) ->
             if (block.isTable) {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val tableWidth = maxOf(maxWidth, (block.tableColumnCount!! * 116).dp)
@@ -297,20 +328,20 @@ private fun AnalysisReportCard(markdown: String) {
                     ) {
                         MarkdownText(
                             markwon = markwon,
-                            markdown = block.markdown,
+                            markdown = spanned,
                             modifier = Modifier.width(tableWidth),
                         )
                     }
                 }
             } else {
-                MarkdownText(markwon, block.markdown, Modifier.fillMaxWidth())
+                MarkdownText(markwon, spanned, Modifier.fillMaxWidth())
             }
         }
     }
 }
 
 @Composable
-private fun MarkdownText(markwon: Markwon, markdown: String, modifier: Modifier) {
+private fun MarkdownText(markwon: Markwon, markdown: Spanned, modifier: Modifier) {
     AndroidView(
         factory = { viewContext ->
             TextView(viewContext).apply {
@@ -329,7 +360,12 @@ private fun MarkdownText(markwon: Markwon, markdown: String, modifier: Modifier)
             }
         },
         modifier = modifier,
-        update = { textView -> markwon.setMarkdown(textView, markdown) },
+        update = { textView ->
+            if (textView.tag !== markdown) {
+                markwon.setParsedMarkdown(textView, markdown)
+                textView.tag = markdown
+            }
+        },
     )
 }
 

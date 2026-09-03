@@ -56,6 +56,7 @@ import io.noties.markwon.image.AsyncDrawable
 import io.noties.markwon.image.AsyncDrawableSpan
 import io.noties.markwon.image.ImageSizeResolver
 import io.noties.markwon.ext.latex.JLatexMathPlugin
+import io.noties.markwon.ext.latex.JLatexAsyncDrawableSpan
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TableAwareMovementMethod
 import io.noties.markwon.ext.tables.TablePlugin
@@ -542,6 +543,7 @@ internal class MarkdownImagePlugin private constructor(
                 }
                 val text = textView.text as? Spanned ?: return
                 val images = text.getSpans(0, text.length, AsyncDrawableSpan::class.java)
+                    .filterNot { it is JLatexAsyncDrawableSpan }
                 var waitingForResult = false
                 images.forEach { span ->
                     val drawable = span.drawable
@@ -584,7 +586,9 @@ internal class MarkdownImagePlugin private constructor(
     private fun installImageClickSpans(textView: TextView) {
         val original = textView.text as? Spanned ?: return
         val text = original as? Spannable ?: SpannableStringBuilder(original)
-        original.getSpans(0, original.length, AsyncDrawableSpan::class.java).forEach { span ->
+        original.getSpans(0, original.length, AsyncDrawableSpan::class.java)
+            .filterNot { it is JLatexAsyncDrawableSpan }
+            .forEach { span ->
             val start = original.getSpanStart(span)
             val end = original.getSpanEnd(span)
             if (text.getSpans(start, end, MarkdownImageClickSpan::class.java).isEmpty()) {
@@ -615,25 +619,18 @@ internal class MarkdownImagePlugin private constructor(
         result.draw(Canvas(bitmap))
         result.bounds = previousBounds
 
-        var left = width
-        var top = height
-        var right = -1
-        var bottom = -1
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                if (bitmap.getPixel(x, y).ushr(24) > MIN_VISIBLE_ALPHA) {
-                    left = minOf(left, x)
-                    top = minOf(top, y)
-                    right = maxOf(right, x)
-                    bottom = maxOf(bottom, y)
-                }
-            }
-        }
-        if (right < left || bottom < top) {
+        val visibleBounds = bitmap.visiblePixelBounds()
+        if (visibleBounds == null) {
             bitmap.recycle()
             return null
         }
-        val cropped = Bitmap.createBitmap(bitmap, left, top, right - left + 1, bottom - top + 1)
+        val cropped = Bitmap.createBitmap(
+            bitmap,
+            visibleBounds.left,
+            visibleBounds.top,
+            visibleBounds.width(),
+            visibleBounds.height(),
+        )
         if (cropped !== bitmap) bitmap.recycle()
         cropped.density = textView.resources.displayMetrics.densityDpi
         return BitmapDrawable(textView.resources, cropped).apply {
@@ -679,13 +676,16 @@ internal class MarkdownImagePlugin private constructor(
     }
 
     private fun Bitmap.visiblePixelBounds(): Rect? {
+        val pixels = IntArray(width * height)
+        getPixels(pixels, 0, width, 0, 0, width, height)
         var left = width
         var top = height
         var right = -1
         var bottom = -1
         for (y in 0 until height) {
+            val rowOffset = y * width
             for (x in 0 until width) {
-                if (getPixel(x, y).ushr(24) > MIN_VISIBLE_ALPHA) {
+                if (pixels[rowOffset + x].ushr(24) > MIN_VISIBLE_ALPHA) {
                     left = minOf(left, x)
                     top = minOf(top, y)
                     right = maxOf(right, x)
