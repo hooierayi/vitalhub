@@ -29,6 +29,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import coil.ImageLoader
 import coil.decode.GifDecoder
@@ -307,6 +308,7 @@ internal const val MARKDOWN_CODE_TEXT_COLOR: Int = 0xFF24292F.toInt()
 
 /** Single construction point for every Markdown parser, renderer and extension used by reports. */
 internal fun createMarkdownRenderer(context: Context): Markwon {
+    val imageLoader = createMarkdownImageLoader(context)
     val markdownTextSizePx = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_SP,
         14f,
@@ -330,8 +332,8 @@ internal fun createMarkdownRenderer(context: Context): Markwon {
                 android.graphics.Color.WHITE,
             ),
         )
-        .usePlugin(CoilImagesPlugin.create(context, createMarkdownImageLoader(context)))
-        .usePlugin(MarkdownImagePlugin.create())
+        .usePlugin(CoilImagesPlugin.create(context, imageLoader))
+        .usePlugin(MarkdownImagePlugin.create(imageLoader))
         .usePlugin(HtmlPlugin.create { it.addHandler(MarkdownKbdTagHandler()) })
         .usePlugin(LinkifyPlugin.create(Linkify.WEB_URLS))
         .usePlugin(MarkdownEmailLinkPlugin.create())
@@ -514,7 +516,9 @@ private class MarkdownLinkResolver : LinkResolver {
     }.getOrDefault(false)
 }
 
-internal class MarkdownImagePlugin private constructor() : AbstractMarkwonPlugin() {
+internal class MarkdownImagePlugin private constructor(
+    private val imageLoader: ImageLoader,
+) : AbstractMarkwonPlugin() {
     private val imageSizeResolver = ResponsiveImageSizeResolver()
     private val pendingAnimations = WeakHashMap<TextView, Runnable>()
     private val trimmedSvgDrawables = Collections.newSetFromMap(WeakHashMap<AsyncDrawable, Boolean>())
@@ -585,7 +589,7 @@ internal class MarkdownImagePlugin private constructor() : AbstractMarkwonPlugin
             val end = original.getSpanEnd(span)
             if (text.getSpans(start, end, MarkdownImageClickSpan::class.java).isEmpty()) {
                 text.setSpan(
-                    MarkdownImageClickSpan(span.drawable.destination),
+                    MarkdownImageClickSpan(span.drawable.destination, imageLoader),
                     start,
                     end,
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
@@ -705,7 +709,7 @@ internal class MarkdownImagePlugin private constructor() : AbstractMarkwonPlugin
         private const val GIF_MOTION_PADDING_RATIO = 0.12f
         private const val MIN_VISIBLE_ALPHA = 8
 
-        fun create(): MarkdownImagePlugin = MarkdownImagePlugin()
+        fun create(imageLoader: ImageLoader): MarkdownImagePlugin = MarkdownImagePlugin(imageLoader)
     }
 }
 
@@ -795,23 +799,41 @@ private class AspectFitMarkdownDrawable(
     override fun unscheduleDrawable(who: Drawable, what: Runnable) = unscheduleSelf(what)
 }
 
-private class MarkdownImageClickSpan(private val imageUrl: String) : android.text.style.ClickableSpan() {
+private class MarkdownImageClickSpan(
+    private val imageUrl: String,
+    private val imageLoader: ImageLoader,
+) : android.text.style.ClickableSpan() {
     override fun onClick(widget: View) {
-        showMarkdownImageDialog(widget.context, imageUrl)
+        showMarkdownImageDialog(widget.context, imageUrl, imageLoader)
     }
 
     override fun updateDrawState(ds: TextPaint) = Unit
 }
 
-private fun showMarkdownImageDialog(context: Context, imageUrl: String) {
+private fun showMarkdownImageDialog(
+    context: Context,
+    imageUrl: String,
+    imageLoader: ImageLoader,
+) {
     val dialog = Dialog(context)
     val imageView = ImageView(context).apply {
         scaleType = ImageView.ScaleType.FIT_CENTER
         contentDescription = "Markdown 图片预览"
     }
+    val loading = ProgressBar(context).apply {
+        isIndeterminate = true
+        contentDescription = "图片加载中"
+    }
+    val loadError = TextView(context).apply {
+        text = "图片加载失败"
+        textSize = 15f
+        gravity = Gravity.CENTER
+        setTextColor(MARKDOWN_CODE_TEXT_COLOR)
+        visibility = View.GONE
+    }
     val imageContainer = FrameLayout(context).apply {
         background = GradientDrawable().apply {
-            color = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+            color = android.content.res.ColorStateList.valueOf(MARKDOWN_CODE_BACKGROUND_COLOR)
             cornerRadius = context.dp(12f).toFloat()
         }
         addView(
@@ -819,6 +841,22 @@ private fun showMarkdownImageDialog(context: Context, imageUrl: String) {
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        addView(
+            loading,
+            FrameLayout.LayoutParams(
+                context.dp(48f),
+                context.dp(48f),
+                Gravity.CENTER,
+            ),
+        )
+        addView(
+            loadError,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER,
             ),
         )
     }
@@ -832,7 +870,12 @@ private fun showMarkdownImageDialog(context: Context, imageUrl: String) {
     }
     dialog.setContentView(
         FrameLayout(context).apply {
-            setPadding(context.dp(16f), context.dp(16f), context.dp(16f), context.dp(16f))
+            setPadding(
+                context.dp(PREVIEW_HORIZONTAL_MARGIN_DP),
+                context.dp(20f),
+                context.dp(PREVIEW_HORIZONTAL_MARGIN_DP),
+                context.dp(20f),
+            )
             addView(
                 imageContainer,
                 FrameLayout.LayoutParams(
@@ -861,10 +904,19 @@ private fun showMarkdownImageDialog(context: Context, imageUrl: String) {
             android.view.WindowManager.LayoutParams.WRAP_CONTENT,
         )
     }
-    val imageLoader = createMarkdownImageLoader(context)
     val request = imageLoader.enqueue(
         ImageRequest.Builder(context)
             .data(imageUrl)
+            .listener(
+                onError = { _, _ ->
+                    loading.visibility = View.GONE
+                    loadError.visibility = View.VISIBLE
+                },
+                onSuccess = { _, _ ->
+                    loading.visibility = View.GONE
+                    loadError.visibility = View.GONE
+                },
+            )
             .target(imageView)
             .build(),
     )
@@ -885,3 +937,4 @@ private fun Context.dp(value: Float): Int = TypedValue.applyDimension(
 ).roundToInt()
 
 private const val FOOTNOTE_SCHEME = "vitalhub-footnote://"
+private const val PREVIEW_HORIZONTAL_MARGIN_DP = 24f
